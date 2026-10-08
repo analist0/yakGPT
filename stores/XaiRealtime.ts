@@ -9,6 +9,8 @@ import { getChatById, updateChatMessages } from "./utils";
 import { Message } from "./Message";
 import { addChat } from "./ChatActions";
 import { captureError } from "./ErrorLog";
+import { activeTools, runTool, ToolSpec } from "./Tools";
+import { skillsPrompt } from "./Skills";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -48,6 +50,12 @@ interface RealtimeSession {
   messageIds: Map<string, string>;
   // User message created when speech starts, before its transcript arrives
   pendingUserMessageId: string | undefined;
+  // Tools offered to the model for this session
+  tools: ToolSpec[];
+  // Tool calls per response: the follow-up response is requested once the
+  // response is done and every call in it has an output
+  toolBatches: Map<string, { pending: Set<string>; done: boolean; cancelled?: boolean }>;
+  seenCalls: Set<string>;
 }
 
 let session: RealtimeSession | undefined;
@@ -99,7 +107,7 @@ const base64Pcm16ToFloat = (data: string) => {
   return samples;
 };
 
-const buildInstructions = (chatId: string) => {
+const buildInstructions = (chatId: string, tools: ToolSpec[]) => {
   const chat = getChatById(get().chats, chatId);
   const messages = chat?.messages || [];
   const systemPrompt = messages
@@ -112,8 +120,15 @@ const buildInstructions = (chatId: string) => {
     .map((m) => `${m.role}: ${m.content}`)
     .join("\n");
 
+  const toolHint =
+    tools.length > 0 &&
+    "You can call tools. Before a tool call that may take a moment, say briefly what you are doing.";
+  const skills = tools.some((t) => t.name === "load_skill") && skillsPrompt();
+
   return [
     systemPrompt || "You are a helpful assistant. Keep spoken answers short.",
+    toolHint,
+    skills,
     history && `Conversation so far:\n${history}`,
   ]
     .filter(Boolean)
@@ -178,7 +193,8 @@ const finalizeMessages = (s: RealtimeSession) =>
       messages.map((m) => {
         const ids = [...s.messageIds.values(), s.pendingUserMessageId];
         if (!m.loading || !ids.includes(m.id)) return m;
-        return { ...m, loading: false, content: m.content || "🎤" };
+        const empty = !m.content && !m.toolCalls?.length;
+        return { ...m, loading: false, content: empty && m.role === "user" ? "🎤" : m.content };
       })
     ),
   }));
@@ -204,6 +220,74 @@ const playAudio = (s: RealtimeSession, data: string) => {
   s.playhead = startAt + buffer.duration;
   s.sources.add(source);
   source.onended = () => s.sources.delete(source);
+};
+
+// Ask for the follow-up answer once the response that called tools is done
+// and every one of its calls has an output
+const maybeRespond = (s: RealtimeSession, responseId: string) => {
+  const batch = s.toolBatches.get(responseId);
+  if (!batch || !batch.done || batch.pending.size > 0) return;
+  s.toolBatches.delete(responseId);
+  if (!batch.cancelled && session === s && s.ws.readyState === WebSocket.OPEN) {
+    s.ws.send(JSON.stringify({ type: "response.create" }));
+  }
+};
+
+const handleFunctionCall = async (
+  s: RealtimeSession,
+  responseId: string | undefined,
+  call: { call_id?: string; name?: string; arguments?: string; item_id?: string }
+) => {
+  const callId = call.call_id;
+  if (!callId || !call.name || s.seenCalls.has(callId)) return;
+  s.seenCalls.add(callId);
+  const name = call.name;
+  const args = call.arguments || "";
+  const batchKey = responseId || CURRENT_RESPONSE;
+
+  let batch = s.toolBatches.get(batchKey);
+  if (!batch) {
+    batch = { pending: new Set(), done: false };
+    s.toolBatches.set(batchKey, batch);
+  }
+  batch.pending.add(callId);
+
+  const messageId = messageFor(s, responseId || call.item_id || CURRENT_RESPONSE, "assistant");
+  updateMessage(s.chatId, messageId, (m) => {
+    m.toolCalls = [
+      ...(m.toolCalls || []),
+      {
+        id: callId,
+        name,
+        label: s.tools.find((t) => t.name === name)?.label,
+        arguments: args,
+        status: "running",
+      },
+    ];
+  });
+
+  let update: { result: string; status: "done" | "error" };
+  try {
+    update = { result: await runTool(s.tools, name, args), status: "done" };
+  } catch (error) {
+    captureError("tools", error, { details: name });
+    update = { result: `Error: ${(error as Error).message}`, status: "error" };
+  }
+  if (session !== s) return;
+
+  updateMessage(s.chatId, messageId, (m) => {
+    m.toolCalls = m.toolCalls?.map((c) => (c.id === callId ? { ...c, ...update } : c));
+  });
+  if (s.ws.readyState === WebSocket.OPEN) {
+    s.ws.send(
+      JSON.stringify({
+        type: "conversation.item.create",
+        item: { type: "function_call_output", call_id: callId, output: update.result },
+      })
+    );
+  }
+  batch.pending.delete(callId);
+  maybeRespond(s, batchKey);
 };
 
 const handleEvent = (s: RealtimeSession, event: any) => {
@@ -263,10 +347,28 @@ const handleEvent = (s: RealtimeSession, event: any) => {
       break;
     }
 
-    case "response.done":
+    case "response.function_call_arguments.done":
+      handleFunctionCall(s, event.response_id, event);
+      break;
+
+    case "response.done": {
+      const responseId: string | undefined = event.response?.id || event.response_id;
+      // Fallback for calls whose arguments event was missed
+      for (const item of event.response?.output || []) {
+        if (item?.type === "function_call") handleFunctionCall(s, responseId, item);
+      }
       finalizeMessages(s);
       s.messageIds.delete(CURRENT_RESPONSE);
+      const batchKey = responseId || CURRENT_RESPONSE;
+      const batch = s.toolBatches.get(batchKey);
+      if (batch) {
+        batch.done = true;
+        // An interrupted response: the user's new turn gets its own response
+        batch.cancelled = event.response?.status === "cancelled";
+        maybeRespond(s, batchKey);
+      }
       break;
+    }
 
     case "error":
       captureError("realtime", event.error?.message || "xAI realtime error", {
@@ -330,6 +432,7 @@ export const startRealtime = async (router: NextRouter) => {
     if (!get().activeChatId) addChat(router);
     const chatId = get().activeChatId!;
 
+    const tools = activeTools();
     const model = settingsForm.realtime_model_xai || XAI_REALTIME_MODELS[0];
     const ws = new WebSocket(
       `wss://api.x.ai/v1/realtime?model=${encodeURIComponent(model)}`,
@@ -349,6 +452,9 @@ export const startRealtime = async (router: NextRouter) => {
       sources: new Set(),
       messageIds: new Map(),
       pendingUserMessageId: undefined,
+      tools,
+      toolBatches: new Map(),
+      seenCalls: new Set(),
     };
     session = s;
 
@@ -383,7 +489,7 @@ export const startRealtime = async (router: NextRouter) => {
         JSON.stringify({
           type: "session.update",
           session: {
-            instructions: buildInstructions(chatId),
+            instructions: buildInstructions(chatId, tools),
             voice: settingsForm.voice_id_xai || XAI_REALTIME_VOICES[0],
             turn_detection: { type: "server_vad" },
             audio: {
@@ -393,6 +499,14 @@ export const startRealtime = async (router: NextRouter) => {
               },
               output: { format: { type: "audio/pcm", rate: OUTPUT_RATE } },
             },
+            ...(tools.length > 0 && {
+              tools: tools.map((t) => ({
+                type: "function",
+                name: t.name,
+                description: t.description,
+                parameters: t.parameters,
+              })),
+            }),
           },
         })
       );
