@@ -24,6 +24,7 @@ import { refreshModels, updateSettingsForm } from "@/stores/ChatActions";
 import * as Azure from "@/stores/AzureSDK";
 import { azureCandidateLanguages } from "./azureLangs";
 import { OPENAI_TTS_VOICES, validateVoice } from "@/stores/OpenAI";
+import { providers } from "@/stores/Providers";
 
 function getLanguages() {
   const languageCodes = ISO6391.getAllCodes();
@@ -36,6 +37,7 @@ function getLanguages() {
 export default function SettingsModal({ close }: { close: () => void }) {
   const modelChoicesChat =
     useChatStore((state) => state.modelChoicesChat) || [];
+  const chatProvider = useChatStore((state) => state.chatProvider);
   const [voices11Labs, setVoices11Labs] = useState<ElevenLabs.Voice[]>([]);
   const [voicesAzure, setVoicesAzure] = useState<Azure.Voice[]>([]);
   const [voiceStylesAzure, setVoiceStylesAzure] = useState<string[]>([]);
@@ -147,7 +149,7 @@ export default function SettingsModal({ close }: { close: () => void }) {
                 <Accordion.Panel>
                   <Select
                     required
-                    label="Model"
+                    label={`Model (${providers[chatProvider].name})`}
                     placeholder="Select a model"
                     value={form.values.model}
                     onChange={(value) => form.setFieldValue("model", value!)}

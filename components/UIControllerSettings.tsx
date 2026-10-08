@@ -1,8 +1,11 @@
 import {
   refreshModels,
+  setChatProvider,
   update,
   updateSettingsForm,
 } from "@/stores/ChatActions";
+import { configuredProviders, providers } from "@/stores/Providers";
+import { shallow } from "zustand/shallow";
 import { useChatStore } from "@/stores/ChatStore";
 import { getModelInfo } from "@/stores/Model";
 import { Button, Menu, px } from "@mantine/core";
@@ -36,6 +39,8 @@ export default function UIController() {
   const modelChoicesChat =
     useChatStore((state) => state.modelChoicesChat) || [];
   const settingsForm = useChatStore((state) => state.settingsForm);
+  const chatProvider = useChatStore((state) => state.chatProvider);
+  const availableProviders = useChatStore(configuredProviders, shallow);
   const modelChoiceSTT = useChatStore((state) => state.modelChoiceSTT);
   const modelChoiceTTS = useChatStore((state) => state.modelChoiceTTS);
   const autoSendStreamingSTT = useChatStore(
@@ -44,13 +49,21 @@ export default function UIController() {
 
   useEffect(() => {
     refreshModels();
-  }, []);
+  }, [chatProvider]);
 
   // Filter out models that end with a date eg. gpt-3-1234
   const primaryModels = modelChoicesChat.filter(
     (model) => !model.match(/-\d{4}$/)
   );
   const menuStructure = [
+    {
+      label: "Chat provider",
+      items: availableProviders.map((provider) => ({
+        text: providers[provider].name,
+        checked: chatProvider === provider,
+        onClick: () => setChatProvider(provider),
+      })),
+    },
     {
       label: "Chat",
       items: primaryModels.map((model) => ({

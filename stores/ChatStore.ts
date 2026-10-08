@@ -5,6 +5,7 @@ import { Chat } from "./Chat";
 import { SpeechRecognizer } from "microsoft-cognitiveservices-speech-sdk";
 import type { AudioChunk } from "./PlayerActions";
 import { OPENAI_TTS_VOICES } from "./OpenAI";
+import { ProviderId } from "./Providers";
 
 export type APIState = "idle" | "loading" | "error";
 export type AudioState = "idle" | "recording" | "transcribing" | "processing";
@@ -91,6 +92,9 @@ export const defaultSettings = {
 export interface ChatState {
   apiState: APIState;
   apiKey: string | undefined;
+  apiKeyXai: string | undefined;
+  ollamaBaseUrl: string | undefined;
+  chatProvider: ProviderId;
   apiKey11Labs: string | undefined;
   apiKeyAzure: string | undefined;
   apiKeyAzureRegion: string | undefined;
@@ -132,6 +136,9 @@ export interface ChatState {
 export const initialState = {
   apiState: "idle" as APIState,
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || undefined,
+  apiKeyXai: process.env.NEXT_PUBLIC_XAI_API_KEY || undefined,
+  ollamaBaseUrl: process.env.NEXT_PUBLIC_OLLAMA_BASE_URL || undefined,
+  chatProvider: (process.env.NEXT_PUBLIC_CHAT_PROVIDER || "openai") as ProviderId,
   apiKey11Labs: process.env.NEXT_PUBLIC_11LABS_API_KEY || undefined,
   apiKeyAzure: process.env.NEXT_PUBLIC_AZURE_API_KEY || undefined,
   apiKeyAzureRegion: process.env.NEXT_PUBLIC_AZURE_REGION || undefined,

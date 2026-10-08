@@ -5,6 +5,7 @@ import { getChatById, updateChatMessages } from "./utils";
 import { notifications } from "@mantine/notifications";
 import { getModelInfo } from "./Model";
 import { useChatStore } from "./ChatStore";
+import { getProviderConnection, isProviderConfigured } from "./Providers";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -73,11 +74,11 @@ export const submitMessage = async (message: Message) => {
     }),
   }));
 
-  const apiKey = get().apiKey;
-  if (apiKey === undefined) {
-    console.error("API key not set");
+  if (!isProviderConfigured(get())) {
+    console.error("Chat provider not configured");
     return;
   }
+  const connection = getProviderConnection(get());
 
   const updateTokens = (promptTokensUsed: number, completionTokensUsed: number) => {
     const activeModel = get().settingsForm.model;
@@ -108,7 +109,7 @@ export const submitMessage = async (message: Message) => {
   await streamCompletion(
     chat.messages,
     settings,
-    apiKey,
+    connection,
     abortController,
     (content) => {
       set((state) => ({
@@ -142,10 +143,11 @@ export const submitMessage = async (message: Message) => {
         findChatTitle();
       }
     },
-    (errorRes, errorBody) => {
+    (status, errorBody) => {
       let message = errorBody;
       try {
-        message = JSON.parse(errorBody).error.message;
+        const error = JSON.parse(errorBody).error;
+        message = typeof error === "string" ? error : error.message;
       } catch (e) {}
 
       notifications.show({
@@ -189,7 +191,7 @@ export const submitMessage = async (message: Message) => {
       await streamCompletion(
         [msg, ...chat.messages.slice(1)],
         settings,
-        apiKey,
+        connection,
         undefined,
         (content) => {
           set((state) => ({

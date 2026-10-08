@@ -10,6 +10,7 @@ import { Notifications } from "@mantine/notifications";
 import "highlight.js/styles/stackoverflow-dark.css";
 
 import { useChatStore } from "@/stores/ChatStore";
+import { isProviderConfigured } from "@/stores/Providers";
 
 import Nav from "@/components/Nav";
 import { useEffect, useState } from "react";
@@ -28,7 +29,7 @@ export default function App(props: AppProps) {
     setColorScheme(nextColorScheme);
   };
 
-  const apiKey = useChatStore((state) => state.apiKey);
+  const chatConfigured = useChatStore(isProviderConfigured);
   const playerMode = useChatStore((state) => state.playerMode);
 
   const [isHydrated, setIsHydrated] = useState(false);
@@ -110,7 +111,7 @@ export default function App(props: AppProps) {
             <div style={{ position: "relative", height: "100%" }}>
               <Component {...pageProps} />
 
-              {apiKey && <UIController />}
+              {chatConfigured && <UIController />}
             </div>
             {playerMode && <AudioPlayer />}
           </AppShell>

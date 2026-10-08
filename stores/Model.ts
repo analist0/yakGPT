@@ -43,9 +43,16 @@ export const modelInfos: Record<
   },
 };
 
+// Context sizes for model families not listed above. Costs are unknown (0).
+const contextByPrefix: [RegExp, number][] = [
+  [/^grok-/, 128 * 1024],
+  [/^(gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o\d)/, 128 * 1024],
+];
+
 export const getModelInfo = (model: string) =>
   modelInfos[model] || {
     displayName: model,
-    maxTokens: 4096,
+    maxTokens:
+      contextByPrefix.find(([prefix]) => prefix.test(model))?.[1] || 4096,
     costPer1kTokens: { prompt: 0, completion: 0 },
   };
