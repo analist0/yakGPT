@@ -8,6 +8,7 @@ import { useChatStore } from "./ChatStore";
 import { getChatById, updateChatMessages } from "./utils";
 import { Message } from "./Message";
 import { addChat } from "./ChatActions";
+import { captureError } from "./ErrorLog";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -125,11 +126,15 @@ const updateMessage = (
   update: (message: Message) => void
 ) =>
   set((state) => ({
-    chats: updateChatMessages(state.chats, chatId, (messages) => {
-      const message = messages.find((m) => m.id === messageId);
-      if (message) update(message);
-      return messages;
-    }),
+    chats: updateChatMessages(state.chats, chatId, (messages) =>
+      messages.map((m) => {
+        if (m.id !== messageId) return m;
+        // Copy so memoized message views re-render
+        const copy = { ...m };
+        update(copy);
+        return copy;
+      })
+    ),
   }));
 
 const addMessage = (chatId: string, role: Message["role"]) => {
@@ -264,6 +269,9 @@ const handleEvent = (s: RealtimeSession, event: any) => {
       break;
 
     case "error":
+      captureError("realtime", event.error?.message || "xAI realtime error", {
+        details: JSON.stringify(event).slice(0, 500),
+      });
       notifications.show({
         message: event.error?.message || "xAI realtime error",
         color: "red",
@@ -401,6 +409,7 @@ export const startRealtime = async (router: NextRouter) => {
     ws.onclose = (e) => {
       if (session !== s) return;
       if (e.code !== 1000) {
+        captureError("realtime", `Realtime session closed (${e.code})`, { details: e.reason });
         notifications.show({
           message: `Realtime session closed${e.reason ? `: ${e.reason}` : ""}`,
           color: "red",
@@ -413,6 +422,7 @@ export const startRealtime = async (router: NextRouter) => {
     if (!session) audioContext?.close();
     stopRealtime();
     if ((error as Error).message !== "cancelled") {
+      captureError("realtime", error);
       notifications.show({
         message: (error as Error).message || "Could not start realtime voice",
         color: "red",

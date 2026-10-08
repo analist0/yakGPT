@@ -1,0 +1,45 @@
+.stat {
+  padding: 12px;
+  border-radius: var(--mantine-radius-md);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  min-width: 0;
+}
+
+.statIcon {
+  color: var(--mantine-color-brand-5);
+}
+
+.model {
+  padding: 12px 14px;
+  border-radius: var(--mantine-radius-lg);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  transition:
+    border-color 200ms ease,
+    transform 200ms var(--app-ease),
+    box-shadow 200ms ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px -20px rgba(100, 73, 253, 0.6);
+  }
+
+  &[data-best] {
+    border-color: light-dark(rgba(100, 73, 253, 0.35), rgba(120, 98, 253, 0.45));
+    background:
+      linear-gradient(135deg, rgba(120, 98, 253, 0.08), rgba(34, 211, 238, 0.05)),
+      var(--app-surface);
+  }
+
+  &[data-disabled] {
+    opacity: 0.55;
+  }
+}
+
+.installed {
+  padding: 8px 12px;
+  border-radius: var(--mantine-radius-md);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+}

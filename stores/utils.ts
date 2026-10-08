@@ -13,10 +13,7 @@ export const updateChatMessages = (
   chatId: string,
   updateFunc: (messages: Message[]) => Message[]
 ): Chat[] => {
-  return chats.map((c) => {
-    if (c.id === chatId) {
-      c.messages = updateFunc(c.messages);
-    }
-    return c;
-  });
+  return chats.map((c) =>
+    c.id === chatId ? { ...c, messages: updateFunc(c.messages) } : c
+  );
 };

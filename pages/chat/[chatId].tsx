@@ -1,5 +1,5 @@
-import ChatDisplay from "@/components/ChatDisplay";
+import ChatView from "@/components/chat/ChatView";
 
-export default function Home() {
-  return <ChatDisplay />;
+export default function ChatPage() {
+  return <ChatView />;
 }

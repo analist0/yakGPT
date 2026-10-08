@@ -2,12 +2,31 @@ import encoder from "@nem035/gpt-3-encoder";
 
 export const countTokens = (text: string) => encoder.encode(text).length;
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  label?: string;
+  arguments: string;
+  result?: string;
+  status?: "running" | "done" | "error";
+}
+
 export interface Message {
   id: string;
   content: string;
   role: "user" | "assistant" | "system";
   loading?: boolean;
+  // Model thinking, shown collapsed
+  reasoning?: string;
+  // Function calls made by the assistant in this step, with their results
+  toolCalls?: ToolCall[];
 }
+
+const messageText = (message: Message) =>
+  message.content +
+  (message.toolCalls || [])
+    .map((c) => c.arguments + (c.result || ""))
+    .join("");
 
 // Helper function to estimate tokens
 function estimateTokens(content: string): number {
@@ -35,7 +54,7 @@ export function truncateMessages(
   let startIdx = 0;
 
   if (messages[0].role === "system") {
-    accumulatedTokens = estimateTokens(messages[0].content);
+    accumulatedTokens = estimateTokens(messageText(messages[0]));
     ret.push(messages[0]);
     startIdx = 1;
   }
@@ -43,13 +62,13 @@ export function truncateMessages(
   // Try to truncate messages as is
   for (let i = messages.length - 1; i >= startIdx; i--) {
     const message = messages[i];
-    const tokens = estimateTokens(message.content);
+    const tokens = estimateTokens(messageText(message));
     if (accumulatedTokens + tokens > targetTokens) {
       break;
     }
     accumulatedTokens += tokens;
-    // Insert at position 1
-    ret.splice(1, 0, message);
+    // Insert right after the system message, keeping the original order
+    ret.splice(startIdx, 0, message);
   }
   return ret;
 }
