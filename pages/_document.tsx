@@ -7,6 +7,11 @@ export default function Document() {
       <Head>
         <ColorSchemeScript defaultColorScheme="dark" />
         <meta name="theme-color" content="#0a0b14" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </Head>
       <body>
         <Main />

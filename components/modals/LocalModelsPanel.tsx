@@ -130,6 +130,81 @@ function PullStatus({ name }: { name: string }) {
   );
 }
 
+type ClientOs = "windows" | "mac" | "android" | "linux";
+
+// Ollama runs next to the browser, so detect the browser's OS
+const detectClientOs = (): ClientOs => {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  if (/android/i.test(ua)) return "android";
+  if (/windows/i.test(ua)) return "windows";
+  if (/mac os|macintosh/i.test(ua)) return "mac";
+  return "linux";
+};
+
+const OLLAMA_INSTALL: Record<ClientOs, string> = {
+  windows: "winget install Ollama.Ollama",
+  mac: "brew install ollama   # or download it from ollama.com",
+  linux: "curl -fsSL https://ollama.com/install.sh | sh",
+  android: "pkg install ollama   # in Termux",
+};
+
+function OllamaSetup() {
+  const t = useT();
+  const [os, setOs] = useState<ClientOs>(detectClientOs);
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  // Ollama accepts localhost pages by default; other sites must be allowed
+  const needsOrigin = !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const start = !needsOrigin
+    ? "ollama serve"
+    : os === "windows"
+    ? `$env:OLLAMA_ORIGINS="${origin}"; ollama serve`
+    : `OLLAMA_ORIGINS=${origin} ollama serve`;
+
+  return (
+    <Stack gap={6}>
+      <SegmentedControl
+        size="xs"
+        value={os}
+        onChange={(v) => setOs(v as ClientOs)}
+        data={[
+          { value: "windows", label: "Windows" },
+          { value: "mac", label: "macOS" },
+          { value: "linux", label: "Linux" },
+          { value: "android", label: "Android (Termux)" },
+        ]}
+      />
+      <Text size="sm">{t("1. Install Ollama:", "1. התקנת Ollama:")}</Text>
+      <Code block dir="ltr">
+        {OLLAMA_INSTALL[os]}
+      </Code>
+      <Text size="sm">
+        {needsOrigin
+          ? t(
+              "2. Start it and allow this site to reach it:",
+              "2. הפעלה עם הרשאה לאתר הזה להתחבר אליו:"
+            )
+          : os === "windows" || os === "mac"
+          ? t(
+              "2. Open the Ollama app (it keeps running in the background), or run:",
+              "2. פתח את אפליקציית Ollama (היא ממשיכה לרוץ ברקע), או הרץ:"
+            )
+          : t("2. Start it:", "2. הפעלה:")}
+      </Text>
+      <Code block dir="ltr">
+        {start}
+      </Code>
+      {needsOrigin && os === "windows" && (
+        <Text size="xs" c="dimmed">
+          {t(
+            "Quit the Ollama tray app first, then run this in PowerShell.",
+            "סגור קודם את אפליקציית Ollama שבמגש המערכת, ואז הרץ את זה ב־PowerShell."
+          )}
+        </Text>
+      )}
+    </Stack>
+  );
+}
+
 export default function LocalModelsPanel({ compact = false }: { compact?: boolean }) {
   const t = useT();
   const [hw, setHw] = useState<HardwareInfo>();
@@ -174,15 +249,7 @@ export default function LocalModelsPanel({ compact = false }: { compact?: boolea
               icon={<IconAlertCircle size={18} />}
               title={t("Ollama is not running", "Ollama לא פועל")}
             >
-              <Text size="sm" mb={6}>
-                {t(
-                  "Install Ollama from ollama.com, then start it so this site can reach it:",
-                  "התקן את Ollama מ־ollama.com והפעל אותו כך שהאתר יוכל להתחבר אליו:"
-                )}
-              </Text>
-              <Code block dir="ltr">
-                {`OLLAMA_ORIGINS=${typeof window !== "undefined" ? window.location.origin : "*"} ollama serve`}
-              </Code>
+              <OllamaSetup />
               <Button
                 mt="sm"
                 size="xs"

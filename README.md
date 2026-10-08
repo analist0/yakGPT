@@ -37,23 +37,49 @@ Visit [YakGPT](https://yakgpt.vercel.app) to try it out without installing, or f
 
 ### Installation
 
-1. Clone the repository:
+The install scripts check Node.js (20.9+), install dependencies, build, and create a `yakgpt` launcher. The app listens on `127.0.0.1:3000` only, so it isn't reachable from your network unless you pass `--host 0.0.0.0`.
+
+**Linux / macOS**
 
 ```
-$ git clone https://github.com/yakGPT/YakGPT.git
+$ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
+$ ./scripts/install.sh            # add --ollama to also install Ollama
+$ yakgpt --open
 ```
 
-2. Install dependencies, build the bundle and run the server
+**Windows** (PowerShell)
 
 ```
-$ yarn
-$ yarn build
-$ yarn start
+> git clone https://github.com/analist0/yakGPT.git; cd yakGPT
+> powershell -ExecutionPolicy Bypass -File scripts\install.ps1   # add -Ollama to also install Ollama
 ```
 
-Then navigate to http://localhost:3000
+Then double-click `yakgpt.cmd`. If Node.js is missing, the script installs it with `winget`.
 
-Congratulations! 🎉 You are now running YakGPT locally on your machine.
+**Android (Termux)**
+
+Install [Termux](https://f-droid.org/packages/com.termux/) from F-Droid (the Play Store build is outdated), then:
+
+```
+$ pkg install -y git
+$ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
+$ ./scripts/install.sh --ollama --boot
+$ yakgpt --open
+```
+
+- **Building:** the script installs Node.js with `pkg` and builds with webpack, since Next.js has no native compiler for Android.
+- **Add to Home screen:** in the browser, add YakGPT to the home screen and it opens as a standalone app.
+- **Start at boot:** `--boot` starts YakGPT when the phone boots. It needs the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) app.
+- **Keep it running:** run `termux-wake-lock`, otherwise Android may stop the server in the background.
+- **Local models:** on a phone, small models (1–4B parameters) are the realistic choice.
+
+**Manual**
+
+```
+$ yarn && yarn build && yarn start    # yarn start = node scripts/start.mjs [--port 3000] [--host 127.0.0.1] [--open]
+```
+
+On Termux, build with `yarn build:webpack`.
 
 ## 🔑 Providers and keys
 

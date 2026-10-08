@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10 — Linux, Windows and Termux installers
+
+- **עברית:**
+  - **סקריפטים להתקנה:** בלינוקס/macOS ‏(`scripts/install.sh`), ב־Windows ‏(`scripts/install.ps1`) ובאנדרואיד דרך Termux (אותו `install.sh`). הם בודקים או מתקינים Node.js, מתקינים ובונים, ויוצרים פקודת הפעלה `yakgpt`. אפשר להוסיף גם התקנת Ollama, ובטלפון גם הפעלה אוטומטית כשהוא נדלק.
+  - **הפעלה מקומית בלבד:** השרת מאזין ל־`127.0.0.1` כברירת מחדל.
+  - **התקנה כאפליקציה:** אפשר להוסיף את האפליקציה למסך הבית.
+  - **הוראות Ollama:** מותאמות למערכת ההפעלה.
+- `scripts/start.mjs`: cross-platform launcher for the standalone build.
+  - Copies `public` and `.next/static` next to the standalone server.
+  - Binds to `127.0.0.1` by default (`--host`, `--port`).
+  - `--open` opens the browser (`xdg-open`, `open`, `start` or `termux-open-url`).
+  - `yarn start` now runs it.
+- `scripts/install.sh` (Linux, macOS, Termux):
+  - checks Node ≥ 20.9 (installs it with `pkg` on Termux);
+  - installs dependencies with pinned Yarn 1 and builds; on Termux it uses webpack, because Next.js has no native Android compiler and falls back to WebAssembly;
+  - creates a `yakgpt` launcher;
+  - `--ollama` installs Ollama; `--boot` adds a Termux:Boot start script.
+- `scripts/install.ps1` (Windows): installs Node.js LTS and optionally Ollama with `winget`, builds, and creates `yakgpt.cmd`.
+- `yarn build:webpack` script.
+- `next.config.js`: images are served unoptimized on Android, because `sharp` has no Android build. Also controllable with `YAKGPT_UNOPTIMIZED_IMAGES=1`.
+- `.gitattributes` keeps `.sh`/`.mjs` LF and `.ps1`/`.cmd` CRLF, so scripts run after a Windows checkout.
+- Web app manifest and new icons, so "Add to Home screen" installs YakGPT as a standalone app.
+- The "Ollama is not running" help detects the OS (Windows, macOS, Linux, Android/Termux) and shows the matching install and start commands. `OLLAMA_ORIGINS` is only shown when the page isn't on localhost.
+
 ## 2026-10 — Import skills from GitHub
 
 - **עברית:** ייבוא סקילים ממאגר GitHub ציבורי (למשל `anthropics/skills`), מתיקייה בתוכו או מקישור לקובץ SKILL.md. כל הסקילים שנמצאים מוצגים לבחירה, וייבוא חוזר מעדכן סקילים קיימים במקום לשכפל אותם.
