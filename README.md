@@ -113,7 +113,7 @@ YakGPT finds it automatically. Open **Local models** to see your hardware, the m
 
 ### Realtime voice (Grok)
 
-With an xAI key set, the headset button in the composer starts a speech-to-speech conversation with Grok. Both sides are transcribed into the chat, and the chat's system prompt and recent messages are given to the voice model. Voice and model are under **Settings → Voice**.
+With an xAI key set, the headset button in the composer starts a speech-to-speech conversation with Grok. Both sides are transcribed into the chat, and the chat's system prompt and recent messages are given to the voice model. When tools are on, Grok can call the same built-in tools, MCP tools and skills as the text chat; the calls appear in the chat as tool cards. Voice and model are under **Settings → Voice**.
 
 ### Tools, skills and MCP
 
@@ -160,7 +160,7 @@ YakGPT uses your own API keys. Chats and keys are stored in your browser, and re
 
 ## 👩‍💻 For developers
 
-[docs/DEVELOPERS.md](docs/DEVELOPERS.md) (Hebrew) covers the code map, how a message flows through the agent loop, what is tested and what isn't, known gaps (voice ↔ tools, images/video, tool approval, tests/CI) and the plan for each.
+[docs/DEVELOPERS.md](docs/DEVELOPERS.md) (Hebrew) covers the code map, how a message flows through the agent loop, what is tested and what isn't, known gaps (images/video, tool approval, tests/CI) and the plan for each.
 
 ## 📝 Changelog
 

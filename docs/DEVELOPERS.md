@@ -127,7 +127,7 @@ scripts/
 |---|---|---|
 | הכתבה (Whisper / Azure) והקראה (OpenAI / Azure / ElevenLabs) | 🟡 | קוד מקורי של YakGPT, הותאם ל־UI החדש. לא נבדק מחדש עם מפתחות אמיתיים |
 | שיחה בזמן אמת עם Grok | 🟡 | נבדקו מול WebSocket מדומה: טוקן זמני, `session.update`, הזרמת מיקרופון ותמלולים. **שיחה חיה מול xAI לא נבדקה.** שדה הטוקן בתשובה לא מתועד אצל xAI, ולכן הקוד מנסה גם `value` וגם `client_secret.value` |
-| שיחה בזמן אמת עם כלים / MCP / סקילים | ❌ | **לא מחובר.** ה־Realtime מקבל רק instructions והיסטוריה. ראו סעיף 6.1 |
+| שיחה בזמן אמת עם כלים / MCP / סקילים | 🟡 | מחובר: אותם כלים פעילים של הצ'אט (מובנים, MCP, `load_skill`) נשלחים ב־`session.tools`, והקריאות מוצגות בצ'אט ככרטיסים. נבדק מול WebSocket מדומה, כולל שתי קריאות באותה תשובה, קריאה כפולה וכלים כבויים. **לא נבדק מול xAI אמיתי.** ראו סעיף 6.1 |
 | בחירת מודל קולי אוטומטית | ❌ | |
 
 ### תמונות, וידאו וקבצים
@@ -187,28 +187,26 @@ scripts/
 
 ## 6. תוכנית לפערים העיקריים
 
-### 6.1 חיבור השיחה הקולית לכלים, MCP וסקילים
+### 6.1 חיבור השיחה הקולית לכלים, MCP וסקילים ✅ (בסיס)
 
-כרגע `XaiRealtime.ts` שולח ב־`session.update` רק `instructions`, ‏`voice`, ‏`turn_detection` ו־`audio`.
+מה נבנה ב־`stores/XaiRealtime.ts`:
+1. **רשימת הכלים:** כשכלים מופעלים, `activeTools()` נשלח ב־`session.update` כ־`tools` בפורמט ה־function השטוח של xAI (`{type, name, description, parameters}`). הכלים "ננעלים" בתחילת השיחה: שינוי בכלים או בשרתי MCP תוך כדי שיחה ייכנס לתוקף רק בשיחה הבאה.
+2. **הנחיות:** ל־instructions נוסף משפט שמבקש מהמודל לומר בקצרה מה הוא עושה לפני כלי איטי. אם `load_skill` פעיל, נוספת גם רשימת הסקילים (`skillsPrompt()`).
+3. **הרצה:** ‏`response.function_call_arguments.done` מריץ את הכלי דרך אותו `runTool` של הצ'אט, ושולח `conversation.item.create` מסוג `function_call_output`. כשל בכלי נשלח למודל כטקסט `Error: ...` ונרשם ביומן השגיאות (`tools`).
+4. **תשובת המשך:** הקריאות מקובצות לפי `response_id`. `response.create` אחד נשלח רק אחרי ש־`response.done` הגיע **וגם** כל הקריאות של אותה תשובה החזירו תוצאה. אם התשובה בוטלה (המשתמש קטע), לא נשלח `response.create`, כי הדיבור החדש של המשתמש יוצר תשובה משלו.
+5. **גיבוי:** אם אירוע הארגומנטים לא הגיע, קריאות `function_call` מתוך `response.done.output` מורצות. כפילויות מסוננות לפי `call_id`.
+6. **תצוגה:** הקריאות נשמרות ב־`toolCalls` על הודעת ה־assistant, ומוצגות בדיוק כמו בצ'אט טקסט. אם ממשיכים את השיחה בכתב, הן נשלחות למודל הטקסט כרגיל.
 
-לפי התיעוד של xAI:
-- `session.update` מקבל `tools`, כולל `function`, `mcp`, ‏`web_search` ו־`x_search`.
-- קריאה לכלי מגיעה באירוע `response.function_call_arguments.done`.
-- מחזירים תשובה עם `conversation.item.create` מסוג `function_call_output`, ואחרי **כל** התוצאות שולחים `response.create` אחד.
-
-תוכנית:
-1. **רשימת הכלים:** להעביר את `activeTools()` ל־`session.tools` בפורמט function (שם, תיאור, JSON Schema). בהתאם להגדרה, לצרף גם `web_search` / `x_search` של xAI.
-2. **הרצה:** ב־`handleEvent` לטפל ב־`response.function_call_arguments.done` ולהריץ דרך אותו `runTool` של הצ'אט. כך MCP, סקילים והכלים המובנים עובדים בלי קוד נוסף.
-3. **סקילים:** להוסיף את `skillsPrompt()` ל־instructions.
-4. **תצוגה:** לשמור את הקריאות על הודעת ה־assistant (`toolCalls`) כדי שיוצגו בצ'אט כמו בטקסט.
-5. **אישורים:** כלים שדורשים אישור (סעיף 7) יוצגו כבקשת אישור קולית ובמסך.
-
-היקף משוער: בעיקר `XaiRealtime.ts`. הלוגיקה של הכלים כבר קיימת.
+מה עוד חסר:
+- בדיקה מול xAI אמיתי. הפרוטוקול מומש לפי התיעוד, ולא אומת מול השרת.
+- הכלים של xAI עצמם (`web_search`, ‏`x_search`, ‏`mcp` בצד השרת) עוד לא מוצעים. צריך מתג בהגדרות.
+- אישור לפני הרצת כלי (סעיף 7). כרגע כל כלי פעיל רץ מיד, גם בשיחה קולית.
+- אין מגבלת צעדים כמו `MAX_TOOL_STEPS` בטקסט. המודל יכול לקרוא לכלים שוב ושוב בתוך השיחה.
 
 ### 6.2 תמונות, וידאו, vision וניתוב אוטומטי
 
 **א. צירוף קבצים ו־vision (קודם לכול, כי שאר הסעיפים נשענים עליו):**
-- להרחיב את `Message` ל־`content: string | ContentPart[]` (טקסט ו־`image_url` כ־data URL).
+- להרחיב את `Message` ל־`content: string | ContentPart[]` (טקסט ו־`image_url` כ־ data URL).
 - להוסיף צירוף והדבקה של תמונות ב־`Composer`.
 - רוב הספקים שלנו מקבלים תמונות בפורמט OpenAI: ‏GPT-4o/4.1/5, ‏Gemini, ‏Grok עם vision, ‏OpenRouter, ומודלי vision ב־Ollama כמו `gemma3` ו־`qwen2.5vl`.
 - `truncateMessages`, ‏`toApiMessages` והשמירה ב־localStorage צריכים להתמודד עם תמונות. localStorage מוגבל לכמה MB, ולכן תמונות כנראה יישמרו ב־IndexedDB.
@@ -266,12 +264,13 @@ scripts/
 - [ ] כלים מול ספק אמיתי. למשל "כמה זה 17.5^3" צריך להפעיל את המחשבון.
 - [ ] Ollama אמיתי: זיהוי, הורדת מודל קטן (`qwen3:0.6b`), צ'אט ומחיקה.
 - [ ] שיחה קולית בזמן אמת עם Grok: חיבור, דיבור, קטיעה, תמלול בצ'אט.
+- [ ] שיחה קולית עם כלים: "כמה זה 17 כפול 23?" (מחשבון), "מה השעה?", וכלי MCP. לבדוק שהכרטיסים מופיעים ושהמודל עונה בקול עם התוצאה.
 - [ ] הכתבה (Whisper) והקראה (OpenAI) עם מפתח OpenAI.
 - [ ] ייבוא `anthropics/skills` מ־GitHub ושימוש בסקיל בצ'אט.
 - [ ] MCP מרוחק (DeepWiki) ומקומי (`npx -y @modelcontextprotocol/server-filesystem <dir>`).
 - [ ] Windows: ‏`install.ps1` ואז `yakgpt.cmd`.
 - [ ] Termux על טלפון אמיתי: ‏`install.sh --ollama --boot`, ואז "הוסף למסך הבית".
-- [ ] Sentry: שגיאה מגיעה ל־DSN.
+- [ ] Sentry: שגיאה מגיעה ל־ DSN.
 
 ---
 
