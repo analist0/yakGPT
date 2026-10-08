@@ -1,0 +1,22 @@
+.card {
+  padding: 14px;
+  border-radius: var(--mantine-radius-lg);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  transition:
+    border-color 200ms ease,
+    transform 200ms var(--app-ease);
+
+  &[data-connected] {
+    border-color: light-dark(rgba(18, 184, 134, 0.35), rgba(18, 184, 134, 0.3));
+  }
+
+  &:focus-within {
+    border-color: var(--mantine-color-brand-4);
+  }
+}
+
+.ltr input {
+  direction: ltr;
+  text-align: left;
+}

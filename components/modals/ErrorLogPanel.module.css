@@ -1,0 +1,51 @@
+.entry {
+  border-radius: var(--mantine-radius-md);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+
+  &:hover {
+    background: var(--app-border);
+  }
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  direction: ltr;
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
+.time {
+  flex-shrink: 0;
+  @media (max-width: $mantine-breakpoint-xs) {
+    display: none;
+  }
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--app-text-muted);
+  transition: transform 200ms var(--app-ease);
+
+  &[data-open] {
+    transform: rotate(180deg);
+  }
+}
+
+.stack {
+  direction: ltr;
+  text-align: left;
+  font-size: 11px;
+  max-height: 240px;
+  overflow: auto;
+}

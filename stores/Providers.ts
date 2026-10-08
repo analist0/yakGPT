@@ -1,18 +1,39 @@
 // Chat providers that speak the OpenAI-compatible /v1/chat/completions API.
-export type ProviderId = "openai" | "xai" | "ollama";
+export type ProviderId =
+  | "openai"
+  | "xai"
+  | "groq"
+  | "openrouter"
+  | "gemini"
+  | "ollama";
 
 export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434/v1";
 
-export const providers: Record<
-  ProviderId,
-  {
-    name: string;
-    // Keep only models that can be used for chat
-    filterModels: (ids: string[]) => string[];
-  }
-> = {
+// Name of the store field holding each provider's key
+export const providerKeyField = {
+  openai: "apiKey",
+  xai: "apiKeyXai",
+  groq: "apiKeyGroq",
+  openrouter: "apiKeyOpenRouter",
+  gemini: "apiKeyGemini",
+} as const;
+
+type KeyedProvider = keyof typeof providerKeyField;
+
+interface ProviderInfo {
+  name: string;
+  baseUrl?: string;
+  keyUrl?: string;
+  local?: boolean;
+  // Keep only models that can be used for chat
+  filterModels: (ids: string[]) => string[];
+}
+
+export const providers: Record<ProviderId, ProviderInfo> = {
   openai: {
     name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    keyUrl: "https://platform.openai.com/account/api-keys",
     filterModels: (ids) =>
       ids.filter(
         (id) =>
@@ -24,11 +45,40 @@ export const providers: Record<
   },
   xai: {
     name: "xAI",
+    baseUrl: "https://api.x.ai/v1",
+    keyUrl: "https://console.x.ai",
     filterModels: (ids) =>
       ids.filter((id) => id.startsWith("grok") && !/(image|video)/.test(id)),
   },
+  groq: {
+    name: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    keyUrl: "https://console.groq.com/keys",
+    filterModels: (ids) =>
+      ids.filter((id) => !/(whisper|tts|guard|playai)/.test(id)),
+  },
+  openrouter: {
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    keyUrl: "https://openrouter.ai/keys",
+    filterModels: (ids) => ids,
+  },
+  gemini: {
+    name: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    keyUrl: "https://aistudio.google.com/apikey",
+    filterModels: (ids) =>
+      ids
+        .map((id) => id.replace(/^models\//, ""))
+        .filter(
+          (id) =>
+            id.startsWith("gemini") &&
+            !/(embedding|image|tts|live|native-audio)/.test(id)
+        ),
+  },
   ollama: {
     name: "Ollama",
+    local: true,
     filterModels: (ids) => ids,
   },
 };
@@ -39,6 +89,13 @@ export const normalizeOllamaBaseUrl = (url: string) => {
   return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
 };
 
+// Ollama's native API (model pulls, details) lives next to /v1
+export const ollamaNativeUrl = (baseUrl: string | undefined) =>
+  normalizeOllamaBaseUrl(baseUrl || DEFAULT_OLLAMA_BASE_URL).replace(
+    /\/v1$/,
+    ""
+  );
+
 export const providerIds = Object.keys(providers) as ProviderId[];
 
 export interface ProviderConnection {
@@ -46,30 +103,32 @@ export interface ProviderConnection {
   apiKey: string | undefined;
 }
 
-interface ProviderState {
+type ProviderState = {
   chatProvider: ProviderId;
-  apiKey: string | undefined;
-  apiKeyXai: string | undefined;
   ollamaBaseUrl: string | undefined;
-}
+} & { [K in (typeof providerKeyField)[KeyedProvider]]: string | undefined };
+
+export const getProviderKey = (state: ProviderState, provider: ProviderId) =>
+  provider === "ollama"
+    ? undefined
+    : state[providerKeyField[provider as KeyedProvider]];
 
 export const getProviderConnection = (
   state: ProviderState,
   provider: ProviderId = state.chatProvider
 ): ProviderConnection => {
-  switch (provider) {
-    case "xai":
-      return { baseUrl: "https://api.x.ai/v1", apiKey: state.apiKeyXai };
-    case "ollama":
-      return {
-        baseUrl: normalizeOllamaBaseUrl(
-          state.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL
-        ),
-        apiKey: undefined,
-      };
-    default:
-      return { baseUrl: "https://api.openai.com/v1", apiKey: state.apiKey };
+  if (provider === "ollama") {
+    return {
+      baseUrl: normalizeOllamaBaseUrl(
+        state.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL
+      ),
+      apiKey: undefined,
+    };
   }
+  return {
+    baseUrl: providers[provider].baseUrl!,
+    apiKey: getProviderKey(state, provider),
+  };
 };
 
 export const isProviderConfigured = (
@@ -77,7 +136,7 @@ export const isProviderConfigured = (
   provider: ProviderId = state.chatProvider
 ) => {
   if (provider === "ollama") return !!state.ollamaBaseUrl;
-  return !!getProviderConnection(state, provider).apiKey;
+  return !!getProviderKey(state, provider);
 };
 
 export const configuredProviders = (state: ProviderState) =>

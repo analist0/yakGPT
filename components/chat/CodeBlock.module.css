@@ -1,0 +1,29 @@
+.root {
+  direction: ltr;
+  text-align: left;
+  margin: 0.8em 0;
+  border-radius: var(--mantine-radius-md);
+  background: var(--app-code-bg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.6);
+
+  & pre {
+    overflow-x: auto;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #9aa0bf;
+}
+
+.lang {
+  font-family: var(--mantine-font-family-monospace);
+  text-transform: lowercase;
+}

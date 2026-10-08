@@ -1,0 +1,108 @@
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  padding: 24px 16px max(12px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--app-bg) 55%, transparent);
+}
+
+.inner {
+  max-width: 860px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.box {
+  position: relative;
+  padding: 10px 10px 8px 14px;
+  padding-inline: 16px 10px;
+  border-radius: 24px;
+  background: var(--app-surface-strong);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--app-border-strong);
+  box-shadow:
+    0 20px 50px -24px rgba(20, 20, 60, 0.45),
+    0 0 0 0 rgba(120, 98, 253, 0);
+  transition:
+    border-color 200ms ease,
+    box-shadow 260ms var(--app-ease);
+
+  &:focus-within {
+    border-color: light-dark(rgba(100, 73, 253, 0.45), rgba(120, 98, 253, 0.55));
+    box-shadow:
+      0 24px 60px -24px rgba(20, 20, 60, 0.5),
+      0 0 0 4px rgba(120, 98, 253, 0.14);
+  }
+
+  &[data-recording] {
+    border-color: var(--mantine-color-red-5);
+    box-shadow: 0 0 0 4px rgba(250, 82, 82, 0.15);
+  }
+}
+
+.input {
+  font-size: 1rem;
+  line-height: 1.55;
+  padding: 6px 2px;
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+.toolbar {
+  margin-top: 4px;
+}
+
+.send {
+  transition:
+    transform 180ms var(--app-ease),
+    opacity 180ms ease,
+    box-shadow 180ms ease;
+  opacity: 0.45;
+
+  &[data-ready] {
+    opacity: 1;
+    box-shadow: 0 8px 22px -8px rgba(100, 73, 253, 0.8);
+  }
+
+  &:hover[data-ready] {
+    transform: translateY(-1px) scale(1.04);
+  }
+
+  &:active {
+    transform: scale(0.94);
+  }
+}
+
+.live {
+  animation: live 1.4s ease-in-out infinite;
+}
+
+@keyframes live {
+  50% {
+    box-shadow: 0 0 0 7px rgba(250, 82, 82, 0.18);
+  }
+}
+
+.editing {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: var(--app-surface-strong);
+  border: 1px solid var(--mantine-color-brand-4);
+  color: var(--mantine-color-brand-5);
+}
+
+.hint {
+  margin-top: 8px;
+  opacity: 0.75;
+
+  @media (max-width: $mantine-breakpoint-xs) {
+    display: none;
+  }
+}

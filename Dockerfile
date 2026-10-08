@@ -1,4 +1,4 @@
-FROM node:18.3.0-alpine3.15 AS base
+FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -36,7 +36,7 @@ RUN yarn build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
@@ -54,6 +54,10 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
+ENV PORT=3000
+# Local MCP servers, hardware detection and fetch_url only answer loopback
+# requests. Behind Docker's bridge, opt in with -e YAKGPT_LOCAL_FEATURES=1,
+# and only when the port is not reachable by others: it lets the browser
+# start processes on this container.
 
 CMD ["node", "server.js"]

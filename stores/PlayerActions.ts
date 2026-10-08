@@ -2,6 +2,7 @@ import { genAudio as genAudioAzure } from "@/stores/AzureSDK";
 import { genAudio as genAudio11Labs } from "@/stores/ElevenLabs";
 
 import { useChatStore } from "./ChatStore";
+import { captureError } from "./ErrorLog";
 import { notifications } from "@mantine/notifications";
 import { genAudio as genAudioOpenAI } from "./OpenAI";
 
@@ -207,7 +208,7 @@ const fetchAudio = async (idx: number) => {
       }
     }
   } catch (error) {
-    console.error(error);
+    captureError("voice", error, { details: "text to speech" });
   }
 
   set({ playerApiState: "idle" });

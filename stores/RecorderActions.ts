@@ -5,6 +5,7 @@ import axios from "axios";
 import { assertIsError } from "@/stores/OpenAI";
 
 import { useChatStore } from "./ChatStore";
+import { captureError } from "./ErrorLog";
 import { delMessage, pushMessage, setApiState } from "./ChatActions";
 import { submitMessage } from "./SubmitMessage";
 import { NextRouter } from "next/router";
@@ -151,7 +152,7 @@ export const submitAudio = async (newMessage: Message, blob: Blob) => {
     });
 
     if (response.data.error) {
-      console.error("Error sending audio data:", response.data.error);
+      captureError("voice", response.data.error, { details: "Whisper transcription" });
       notifications.show({
         title: "Error sending audio data",
         message: response.data.error,
@@ -185,6 +186,6 @@ export const submitAudio = async (newMessage: Message, blob: Blob) => {
       message,
       color: "red",
     });
-    console.error("Error sending audio data:", err);
+    captureError("voice", err, { details: "Whisper transcription" });
   }
 };

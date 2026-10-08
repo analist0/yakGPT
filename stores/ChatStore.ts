@@ -6,9 +6,12 @@ import { SpeechRecognizer } from "microsoft-cognitiveservices-speech-sdk";
 import type { AudioChunk } from "./PlayerActions";
 import { OPENAI_TTS_VOICES } from "./OpenAI";
 import { ProviderId } from "./Providers";
+import type { McpServerConfig } from "./Mcp";
+import type { Skill } from "./Skills";
 
 export type APIState = "idle" | "loading" | "error";
 export type RealtimeState = "idle" | "connecting" | "active";
+export type UiLanguage = "he" | "en";
 export type AudioState = "idle" | "recording" | "transcribing" | "processing";
 
 export const excludeFromState = [
@@ -101,6 +104,9 @@ export interface ChatState {
   apiState: APIState;
   apiKey: string | undefined;
   apiKeyXai: string | undefined;
+  apiKeyGroq: string | undefined;
+  apiKeyOpenRouter: string | undefined;
+  apiKeyGemini: string | undefined;
   ollamaBaseUrl: string | undefined;
   chatProvider: ProviderId;
   apiKey11Labs: string | undefined;
@@ -141,11 +147,22 @@ export interface ChatState {
   modelChoiceTTS: string | undefined;
   modelChoiceSTT: string | undefined;
   textInputValue: string;
+
+  uiLanguage: UiLanguage;
+  lastModelByProvider: Partial<Record<ProviderId, string>>;
+  onboardingDone: boolean;
+  toolsEnabled: boolean;
+  disabledTools: string[];
+  mcpServers: McpServerConfig[];
+  skills: Skill[];
 }
 export const initialState = {
   apiState: "idle" as APIState,
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || undefined,
   apiKeyXai: process.env.NEXT_PUBLIC_XAI_API_KEY || undefined,
+  apiKeyGroq: process.env.NEXT_PUBLIC_GROQ_API_KEY || undefined,
+  apiKeyOpenRouter: process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || undefined,
+  apiKeyGemini: process.env.NEXT_PUBLIC_GEMINI_API_KEY || undefined,
   ollamaBaseUrl: process.env.NEXT_PUBLIC_OLLAMA_BASE_URL || undefined,
   chatProvider: (process.env.NEXT_PUBLIC_CHAT_PROVIDER || "openai") as ProviderId,
   apiKey11Labs: process.env.NEXT_PUBLIC_11LABS_API_KEY || undefined,
@@ -186,6 +203,14 @@ export const initialState = {
   modelChoiceTTS: "azure",
   modelChoiceSTT: "azure",
   textInputValue: "",
+
+  uiLanguage: "he" as UiLanguage,
+  lastModelByProvider: {} as Partial<Record<ProviderId, string>>,
+  onboardingDone: false,
+  toolsEnabled: true,
+  disabledTools: [] as string[],
+  mcpServers: [] as McpServerConfig[],
+  skills: [] as Skill[],
 };
 
 const store = () => ({ ...initialState } as ChatState);

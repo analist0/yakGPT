@@ -6,6 +6,7 @@ import { NextRouter } from "next/router";
 import { APIState, ChatState, useChatStore } from "./ChatStore";
 import { submitMessage } from "./SubmitMessage";
 import { fetchModels } from "./OpenAI";
+import { captureError } from "./ErrorLog";
 import {
   ProviderId,
   getProviderConnection,
@@ -111,12 +112,9 @@ export const updateChat = (options: Partial<Chat>) =>
 
 export const setChosenCharacter = (name: string) =>
   set((state) => ({
-    chats: state.chats.map((c) => {
-      if (c.id === state.activeChatId) {
-        c.chosenCharacter = name;
-      }
-      return c;
-    }),
+    chats: state.chats.map((c) =>
+      c.id === state.activeChatId ? { ...c, chosenCharacter: name } : c
+    ),
   }));
 
 export const setNavOpened = (navOpened: boolean) =>
@@ -139,12 +137,13 @@ export const regenerateAssistantMessage = (message: Message) => {
     return;
   }
 
-  // If this is an existing message, remove all the messages after it
+  // Resubmit the user message this answer (and its tool steps) replied to
   const index = chat.messages.findIndex((m) => m.id === message.id);
-
-  const prevMsg = chat.messages[index - 1];
-  if (prevMsg) {
-    submitMessage(prevMsg);
+  const prevUser = [...chat.messages.slice(0, index)]
+    .reverse()
+    .find((m) => m.role === "user" || m.role === "system");
+  if (prevUser) {
+    submitMessage(prevUser);
   }
 };
 
@@ -161,14 +160,30 @@ export const refreshModels = async () => {
     if (get().chatProvider !== provider) return;
     update({ modelChoicesChat: modelIDs });
 
-    // Make sure the selected model exists for this provider
-    const { settingsForm } = get();
+    // Make sure the selected model exists for this provider, preferring the
+    // one last used with it
+    const { settingsForm, lastModelByProvider } = get();
     if (modelIDs.length > 0 && !modelIDs.includes(settingsForm.model)) {
-      updateSettingsForm({ ...settingsForm, model: modelIDs[0] });
+      const remembered = lastModelByProvider[provider];
+      updateSettingsForm({
+        ...settingsForm,
+        model: remembered && modelIDs.includes(remembered) ? remembered : modelIDs[0],
+      });
     }
   } catch (error) {
-    console.error("Failed to fetch models:", error);
+    captureError("models", error, { details: providers[provider].name });
   }
+};
+
+export const selectModel = (model: string, provider = get().chatProvider) => {
+  if (provider !== get().chatProvider) {
+    update({ chatProvider: provider, modelChoicesChat: undefined });
+  }
+  set((state) => ({
+    settingsForm: { ...state.settingsForm, model },
+    lastModelByProvider: { ...state.lastModelByProvider, [provider]: model },
+  }));
+  refreshModels();
 };
 
 export const setChatProvider = (chatProvider: ProviderId) => {

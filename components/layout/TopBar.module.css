@@ -1,0 +1,20 @@
+.start {
+  flex: 1;
+  min-width: 0;
+}
+
+.titleBlock {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.title {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+.meta {
+  @media (max-width: $mantine-breakpoint-xs) {
+    display: none;
+  }
+}
