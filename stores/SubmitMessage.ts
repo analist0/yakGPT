@@ -9,6 +9,7 @@ import { getProviderConnection, isProviderConfigured } from "./Providers";
 import { activeTools, runTool, toOpenAITools, ToolSpec } from "./Tools";
 import { skillsPrompt } from "./Skills";
 import { captureError } from "./ErrorLog";
+import { DECLINED_RESULT, needsApproval, requestApproval } from "./Approval";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -224,6 +225,24 @@ export const submitMessage = async (message: Message) => {
     for (const call of result.toolCalls) {
       if (abortController.signal.aborted) break;
       let update: Partial<ToolCall>;
+      const tool = tools.find((t) => t.name === call.name);
+      if (tool && needsApproval(tool)) {
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, status: "pending" } : c));
+        });
+        const approved = await requestApproval(call.id, abortController.signal);
+        if (!approved) {
+          updateMessageById(chat.id, assistantMsgId, (m) => {
+            m.toolCalls = m.toolCalls?.map((c) =>
+              c.id === call.id ? { ...c, status: "denied", result: DECLINED_RESULT } : c
+            );
+          });
+          continue;
+        }
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, status: "running" } : c));
+        });
+      }
       try {
         update = { result: await runTool(tools, call.name, call.arguments), status: "done" };
       } catch (error) {
@@ -234,7 +253,17 @@ export const submitMessage = async (message: Message) => {
         m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, ...update } : c));
       });
     }
-    if (abortController.signal.aborted) break;
+    if (abortController.signal.aborted) {
+      // Calls that never ran
+      updateMessageById(chat.id, assistantMsgId, (m) => {
+        m.toolCalls = m.toolCalls?.map((c) =>
+          c.status === "running" || c.status === "pending"
+            ? { ...c, status: "error", result: c.result ?? "Stopped" }
+            : c
+        );
+      });
+      break;
+    }
   }
 
   set({ apiState: "idle", currentAbortController: undefined });

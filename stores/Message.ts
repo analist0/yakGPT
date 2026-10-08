@@ -8,7 +8,8 @@ export interface ToolCall {
   label?: string;
   arguments: string;
   result?: string;
-  status?: "running" | "done" | "error";
+  // pending: waiting for the user's approval
+  status?: "running" | "pending" | "done" | "error" | "denied";
 }
 
 export interface Message {

@@ -10,6 +10,7 @@ import {
   FileButton,
   Group,
   SegmentedControl,
+  Select,
   Stack,
   Switch,
   Tabs,
@@ -33,7 +34,9 @@ import {
 } from "@tabler/icons-react";
 import { useChatStore } from "@/stores/ChatStore";
 import { update } from "@/stores/ChatActions";
-import { allTools, toggleTool } from "@/stores/Tools";
+import { allTools, toggleTool, ToolRisk } from "@/stores/Tools";
+import { setToolRule, ToolRule } from "@/stores/Approval";
+import ApprovalModeControl from "@/components/ApprovalModeControl";
 import {
   connectMcpServer,
   McpServerConfig,
@@ -61,6 +64,7 @@ function ToolsTab() {
   const t = useT();
   const toolsEnabled = useChatStore((state) => state.toolsEnabled);
   const disabled = useChatStore((state) => state.disabledTools);
+  const toolRules = useChatStore((state) => state.toolRules);
   useChatStore((state) => state.skills);
   useMcpStatus((state) => state.servers);
   const tools = allTools();
@@ -70,6 +74,12 @@ function ToolsTab() {
     skill: t("Skills", "סקילים"),
     mcp: "MCP",
   };
+  const riskLabel: Record<ToolRisk, string> = {
+    read: t("Reads", "קורא"),
+    write: t("Changes", "משנה"),
+    destructive: t("Can delete or send", "יכול למחוק או לשלוח"),
+  };
+  const riskColor: Record<ToolRisk, string> = { read: "teal", write: "yellow", destructive: "red" };
 
   return (
     <Stack gap="md">
@@ -85,6 +95,12 @@ function ToolsTab() {
         </div>
         <Switch checked={toolsEnabled} onChange={(e) => update({ toolsEnabled: e.currentTarget.checked })} />
       </Group>
+      <div className={classes.row}>
+        <Text fw={600} mb={6}>
+          {t("Ask before running tools", "אישור לפני הפעלת כלים")}
+        </Text>
+        <ApprovalModeControl />
+      </div>
       {tools.map((tool) => (
         <Group key={tool.name} justify="space-between" wrap="nowrap" className={classes.row} data-off={!toolsEnabled || undefined}>
           <div style={{ minWidth: 0 }}>
@@ -95,17 +111,36 @@ function ToolsTab() {
               <Badge size="xs" variant="light" color={tool.source === "mcp" ? "cyan" : tool.source === "skill" ? "grape" : "brand"}>
                 {sourceLabel[tool.source]}
               </Badge>
+              <Badge size="xs" variant="dot" color={riskColor[tool.risk]}>
+                {riskLabel[tool.risk]}
+              </Badge>
             </Group>
             <Text size="xs" c="dimmed" lineClamp={2}>
               {tool.description}
             </Text>
           </div>
-          <Switch
-            size="sm"
-            disabled={!toolsEnabled}
-            checked={!disabled.includes(tool.name)}
-            onChange={() => toggleTool(tool.name)}
-          />
+          <Group gap={8} wrap="nowrap">
+            <Select
+              size="xs"
+              w={120}
+              allowDeselect={false}
+              disabled={!toolsEnabled || disabled.includes(tool.name)}
+              value={toolRules[tool.name] || "mode"}
+              onChange={(value) => setToolRule(tool.name, value === "mode" ? undefined : (value as ToolRule))}
+              data={[
+                { value: "mode", label: t("By mode", "לפי המצב") },
+                { value: "ask", label: t("Always ask", "תמיד לשאול") },
+                { value: "auto", label: t("Never ask", "אף פעם לא לשאול") },
+              ]}
+              aria-label={t("Approval", "אישור")}
+            />
+            <Switch
+              size="sm"
+              disabled={!toolsEnabled}
+              checked={!disabled.includes(tool.name)}
+              onChange={() => toggleTool(tool.name)}
+            />
+          </Group>
         </Group>
       ))}
     </Stack>

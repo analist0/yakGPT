@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10 — Tool approval
+
+- **עברית:** אפשר לבחור מתי המודל צריך לבקש אישור לפני שהוא מפעיל כלי. יש שלושה מצבים:
+  - **רגיל** (ברירת המחדל): רק כלים שקוראים רצים לבד.
+  - **בינוני:** גם שינויים הפיכים רצים לבד. מחיקה, שליחה, תשלום ופרסום דורשים אישור.
+  - **נהיגה חופשית:** הכול רץ בלי לשאול.
+
+  לכל כלי אפשר לקבוע "תמיד לשאול" או "אף פעם לא לשאול". בקשת האישור מופיעה בצ'אט, עם כפתורי אישור, "לאשר תמיד" ודחייה. זה עובד גם בשיחה הקולית.
+- `stores/Approval.ts`: approval modes, per-tool rules, and waiting calls that resolve on approve, decline or abort.
+- `ToolSpec.risk`:
+  - built-in tools are `read`;
+  - MCP tools are classified from MCP annotations (`readOnlyHint`, `destructiveHint`), and unannotated tools count as destructive;
+  - `/api/mcp` and remote MCP now pass annotations through.
+- Tool cards show a pending state with the arguments and buttons. A declined call returns "The user declined this action" to the model.
+- Stopping an answer or a voice session declines pending approvals. Calls that never ran are marked as stopped.
+- The tools menu and the tools panel have the mode switch. The panel also shows each tool's risk and rule.
+
 ## 2026-10 — Images and vision
 
 - **עברית:** אפשר לצרף תמונות להודעה, מכפתור, בהדבקה או בגרירה, ולשאול עליהן מודלים שתומכים בתמונות. התמונות מוקטנות, נשמרות בדפדפן ב־IndexedDB ומוצגות בצ'אט. לחיצה על תמונה פותחת אותה בגודל מלא.

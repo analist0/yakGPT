@@ -125,6 +125,12 @@ Attach up to 8 images per message with the image button, by pasting (Ctrl+V) or 
 Open **Tools, skills & MCP**:
 
 - **Tools**: turn tool use on or off, globally or per tool. Models that don't support tools answer normally.
+- **Approval**: choose when the model must ask before running a tool:
+  - **Normal** (default): only tools that read run on their own.
+  - **Medium**: reads and reversible changes run on their own; deleting, sending, paying or publishing asks.
+  - **Free driving**: nothing asks.
+
+  A per-tool "Always ask" / "Never ask" overrides the mode. MCP tools are classified with the server's MCP annotations; tools without them count as destructive.
 - **MCP servers**: add a remote server by URL, or a local server by command (for example `npx -y @modelcontextprotocol/server-filesystem ~/Documents`). Quick-add presets and `mcp.json` import are included.
 - **Skills**: write instruction packs with a name and a "when to use" description; the model loads one with the `load_skill` tool when a task matches. **Import from GitHub** takes a public repository (for example `anthropics/skills`), a folder in it, or a single `SKILL.md` link, lists every skill it finds and imports the ones you pick. Importing again updates skills with the same name.
 

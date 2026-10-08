@@ -24,6 +24,8 @@ export interface McpTool {
   name: string;
   description?: string;
   inputSchema: Record<string, unknown>;
+  // MCP tool hints, used to decide which calls need approval
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; title?: string };
 }
 
 export type McpConnectionState =
@@ -98,6 +100,7 @@ export const connectMcpServer = async (config: McpServerConfig) => {
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema as Record<string, unknown>,
+        annotations: t.annotations,
       }));
     } else {
       const data = await postServer({ action: "listTools", config });

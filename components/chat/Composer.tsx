@@ -39,6 +39,7 @@ import * as AzureRecorder from "@/stores/AzureRecorderActions";
 import { activeTools } from "@/stores/Tools";
 import { useMcpStatus } from "@/stores/Mcp";
 import { openModal } from "@/stores/Ui";
+import ApprovalModeControl from "@/components/ApprovalModeControl";
 import { useT } from "@/lib/i18n";
 import { MAX_IMAGES_PER_MESSAGE, prepareImage } from "@/lib/images";
 import { captureError } from "@/stores/ErrorLog";
@@ -54,7 +55,7 @@ function ToolsButton() {
   const count = toolsEnabled ? activeTools().length : 0;
 
   return (
-    <Menu position="top-start" width={240}>
+    <Menu position="top-start" width={300}>
       <Menu.Target>
         <Indicator
           label={count}
@@ -84,6 +85,10 @@ function ToolsButton() {
             onChange={(e) => update({ toolsEnabled: e.currentTarget.checked })}
           />
         </Group>
+        <Menu.Label>{t("Ask before running tools", "אישור לפני הפעלת כלים")}</Menu.Label>
+        <div className={classes.approvalModes}>
+          <ApprovalModeControl />
+        </div>
         <Menu.Divider />
         <Menu.Item leftSection={<IconSettings size={15} />} onClick={() => openModal("tools")}>
           {t("Manage tools, skills & MCP", "ניהול כלים, סקילים ו־MCP")}

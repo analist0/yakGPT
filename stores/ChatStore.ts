@@ -8,6 +8,7 @@ import { OPENAI_TTS_VOICES } from "./OpenAI";
 import { ProviderId } from "./Providers";
 import type { McpServerConfig } from "./Mcp";
 import type { Skill } from "./Skills";
+import type { ApprovalMode, ToolRule } from "./Approval";
 
 export type APIState = "idle" | "loading" | "error";
 export type RealtimeState = "idle" | "connecting" | "active";
@@ -158,6 +159,8 @@ export interface ChatState {
   disabledTools: string[];
   mcpServers: McpServerConfig[];
   skills: Skill[];
+  approvalMode: ApprovalMode;
+  toolRules: Record<string, ToolRule>;
 }
 export const initialState = {
   apiState: "idle" as APIState,
@@ -215,6 +218,8 @@ export const initialState = {
   disabledTools: [] as string[],
   mcpServers: [] as McpServerConfig[],
   skills: [] as Skill[],
+  approvalMode: "normal" as ApprovalMode,
+  toolRules: {} as Record<string, ToolRule>,
 };
 
 const store = () => ({ ...initialState } as ChatState);

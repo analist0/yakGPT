@@ -11,6 +11,7 @@ import { addChat } from "./ChatActions";
 import { captureError } from "./ErrorLog";
 import { activeTools, runTool, ToolSpec } from "./Tools";
 import { skillsPrompt } from "./Skills";
+import { DECLINED_RESULT, needsApproval, requestApproval } from "./Approval";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -56,6 +57,8 @@ interface RealtimeSession {
   // response is done and every call in it has an output
   toolBatches: Map<string, { pending: Set<string>; done: boolean; cancelled?: boolean }>;
   seenCalls: Set<string>;
+  // Aborted when the session stops, declining pending approvals
+  abort: AbortController;
 }
 
 let session: RealtimeSession | undefined;
@@ -122,7 +125,7 @@ const buildInstructions = (chatId: string, tools: ToolSpec[]) => {
 
   const toolHint =
     tools.length > 0 &&
-    "You can call tools. Before a tool call that may take a moment, say briefly what you are doing.";
+    "You can call tools. Before a tool call that may take a moment, say briefly what you are doing. Some tool calls wait for the user to approve them on screen; if so, tell the user.";
   const skills = tools.some((t) => t.name === "load_skill") && skillsPrompt();
 
   return [
@@ -266,23 +269,40 @@ const handleFunctionCall = async (
     ];
   });
 
-  let update: { result: string; status: "done" | "error" };
-  try {
-    update = { result: await runTool(s.tools, name, args), status: "done" };
-  } catch (error) {
-    captureError("tools", error, { details: name });
-    update = { result: `Error: ${(error as Error).message}`, status: "error" };
+  let update: { result: string; status: "done" | "error" | "denied" } | undefined;
+  const tool = s.tools.find((t) => t.name === name);
+  if (tool && needsApproval(tool)) {
+    updateMessage(s.chatId, messageId, (m) => {
+      m.toolCalls = m.toolCalls?.map((c) => (c.id === callId ? { ...c, status: "pending" } : c));
+    });
+    const approved = await requestApproval(callId, s.abort.signal);
+    if (session !== s) return;
+    if (!approved) update = { result: DECLINED_RESULT, status: "denied" };
+    else {
+      updateMessage(s.chatId, messageId, (m) => {
+        m.toolCalls = m.toolCalls?.map((c) => (c.id === callId ? { ...c, status: "running" } : c));
+      });
+    }
+  }
+  if (!update) {
+    try {
+      update = { result: await runTool(s.tools, name, args), status: "done" };
+    } catch (error) {
+      captureError("tools", error, { details: name });
+      update = { result: `Error: ${(error as Error).message}`, status: "error" };
+    }
   }
   if (session !== s) return;
+  const result = update;
 
   updateMessage(s.chatId, messageId, (m) => {
-    m.toolCalls = m.toolCalls?.map((c) => (c.id === callId ? { ...c, ...update } : c));
+    m.toolCalls = m.toolCalls?.map((c) => (c.id === callId ? { ...c, ...result } : c));
   });
   if (s.ws.readyState === WebSocket.OPEN) {
     s.ws.send(
       JSON.stringify({
         type: "conversation.item.create",
-        item: { type: "function_call_output", call_id: callId, output: update.result },
+        item: { type: "function_call_output", call_id: callId, output: result.result },
       })
     );
   }
@@ -386,6 +406,7 @@ export const stopRealtime = () => {
   const s = session;
   session = undefined;
   if (s) {
+    s.abort.abort();
     s.ws.onclose = null;
     s.ws.close();
     s.captureNode.port.onmessage = null;
@@ -455,6 +476,7 @@ export const startRealtime = async (router: NextRouter) => {
       tools,
       toolBatches: new Map(),
       seenCalls: new Set(),
+      abort: new AbortController(),
     };
     session = s;
 

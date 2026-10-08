@@ -1,10 +1,14 @@
 // Tool registry for function calling: built-in tools, the load_skill tool and
 // tools exposed by connected MCP servers.
 import { useChatStore } from "./ChatStore";
-import { useMcpStatus, callMcpTool } from "./Mcp";
+import { useMcpStatus, callMcpTool, McpTool } from "./Mcp";
 import { enabledSkills, findSkill } from "./Skills";
 
 export type ToolSource = "builtin" | "skill" | "mcp";
+
+// read: only reads or computes. write: changes something that can be undone
+// or stays inside a sandbox. destructive: deletes, sends, pays or publishes
+export type ToolRisk = "read" | "write" | "destructive";
 
 export interface ToolSpec {
   name: string;
@@ -12,6 +16,7 @@ export interface ToolSpec {
   description: string;
   parameters: Record<string, unknown>;
   source: ToolSource;
+  risk: ToolRisk;
   serverId?: string;
   run: (args: Record<string, any>) => Promise<string>;
 }
@@ -52,6 +57,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       },
     },
     source: "builtin",
+    risk: "read",
     run: async ({ timezone }) => {
       const now = new Date();
       const zone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -72,6 +78,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       required: ["expression"],
     },
     source: "builtin",
+    risk: "read",
     run: async ({ expression }) => evaluateExpression(String(expression)),
   },
   {
@@ -84,6 +91,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       required: ["url"],
     },
     source: "builtin",
+    risk: "read",
     run: async ({ url }) => {
       const res = await fetch("/api/fetch-url", {
         method: "POST",
@@ -107,6 +115,7 @@ const LOAD_SKILL_TOOL: ToolSpec = {
     required: ["name"],
   },
   source: "skill",
+  risk: "read",
   run: async ({ name }) => {
     const skill = findSkill(String(name));
     if (!skill) throw new Error(`No enabled skill named "${name}"`);
@@ -117,6 +126,15 @@ const LOAD_SKILL_TOOL: ToolSpec = {
 // OpenAI-compatible tool names: [a-zA-Z0-9_-]{1,64}
 const slug = (text: string) =>
   text.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+
+// MCP's defaults: a tool that is not read-only counts as destructive unless it
+// says otherwise
+const mcpRisk = (tool: McpTool): ToolRisk =>
+  tool.annotations?.readOnlyHint
+    ? "read"
+    : tool.annotations?.destructiveHint === false
+    ? "write"
+    : "destructive";
 
 export const allTools = (): ToolSpec[] => {
   const { mcpServers } = useChatStore.getState();
@@ -131,6 +149,7 @@ export const allTools = (): ToolSpec[] => {
         description: tool.description || tool.name,
         parameters: tool.inputSchema || { type: "object", properties: {} },
         source: "mcp" as const,
+        risk: mcpRisk(tool),
         serverId: server.id,
         run: (args) => callMcpTool(server.id, tool.name, args),
       }))
