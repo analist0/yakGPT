@@ -56,10 +56,15 @@ const pushAssistantMessage = (chatId: string) => {
   return id;
 };
 
+const AGENT_HINT =
+  "For a task with several steps, first write a plan with update_plan and keep it updated as you go. " +
+  "Hand independent, self-contained subtasks to run_subagent; several calls in one turn run in parallel.";
+
 // Skills, memories and the summary of earlier messages go into the system
 // prompt: appended to the chat's own system message, or sent as one
 const withContext = (messages: Message[], tools: ToolSpec[], chat: Chat) => {
   const prompt = [
+    tools.some((t) => t.name === "run_subagent") && AGENT_HINT,
     tools.some((t) => t.name === "load_skill") && skillsPrompt(),
     memoryPrompt(),
     summaryPrompt(chat),
@@ -249,8 +254,8 @@ export const submitMessage = async (message: Message) => {
     if (result.aborted || result.toolCalls.length === 0) break;
 
     // Run the requested tools and store their results on the message
-    for (const call of result.toolCalls) {
-      if (abortController.signal.aborted) break;
+    const runCall = async (call: (typeof result.toolCalls)[number]) => {
+      if (abortController.signal.aborted) return;
       let update: Partial<ToolCall>;
       const tool = tools.find((t) => t.name === call.name);
       if (tool && needsApproval(tool)) {
@@ -264,14 +269,22 @@ export const submitMessage = async (message: Message) => {
               c.id === call.id ? { ...c, status: "denied", result: DECLINED_RESULT } : c
             );
           });
-          continue;
+          return;
         }
         updateMessageById(chat.id, assistantMsgId, (m) => {
           m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, status: "running" } : c));
         });
       }
       try {
-        update = { result: await runTool(tools, call.name, call.arguments), status: "done" };
+        update = {
+          result: await runTool(tools, call.name, call.arguments, {
+            callId: call.id,
+            chatId: chat.id,
+            signal: abortController.signal,
+            agent: { tools, connection, params: settings },
+          }),
+          status: "done",
+        };
       } catch (error) {
         captureError("tools", error, { details: call.name });
         update = { result: `Error: ${(error as Error).message}`, status: "error" };
@@ -279,6 +292,12 @@ export const submitMessage = async (message: Message) => {
       updateMessageById(chat.id, assistantMsgId, (m) => {
         m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, ...update } : c));
       });
+    };
+    // Sub-agents called together run in parallel; other tools run in order
+    if (result.toolCalls.every((c) => c.name === "run_subagent")) {
+      await Promise.all(result.toolCalls.map(runCall));
+    } else {
+      for (const call of result.toolCalls) await runCall(call);
     }
     if (abortController.signal.aborted) {
       // Calls that never ran

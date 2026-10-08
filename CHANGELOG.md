@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10 — Planning and sub-agents
+
+- **עברית:**
+  - **תוכנית:** במשימות של כמה שלבים המודל כותב תוכנית ומעדכן אותה. התוכנית מוצגת בכרטיס בסוף השיחה, עם התקדמות.
+  - **תתי־סוכנים:** המודל יכול להעביר משימות עצמאיות לתתי־סוכנים. הם עובדים במקביל, כל אחד בהקשר משלו, ומחזירים רק את התוצאה. הכלים שהם מפעילים עוברים את אותם אישורים ומוצגים מתחת לכרטיס של תת־הסוכן.
+- `stores/Agent.ts`: `update_plan` (stored as `chat.plan`, shown in `PlanCard`) and `run_subagent`.
+  - The sub-agent loop runs up to 6 steps with the parent's tools, minus the agent and memory tools.
+  - Its tool calls are recorded as `ToolCall.subCalls` and approved individually.
+- Tools receive a `ToolContext` (call id, chat id, abort signal, the running agent). When all calls in a turn are `run_subagent`, they run in parallel.
+- Planning and sub-agents are not offered in realtime voice.
+
 ## 2026-10 — Memory and context compaction
 
 - **עברית:**

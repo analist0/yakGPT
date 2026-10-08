@@ -76,6 +76,7 @@ function ToolsTab() {
     skill: t("Skills", "סקילים"),
     mcp: "MCP",
     memory: t("Memory", "זיכרון"),
+    agent: t("Agent", "סוכן"),
   };
   const riskLabel: Record<ToolRisk, string> = {
     read: t("Reads", "קורא"),
@@ -111,7 +112,7 @@ function ToolsTab() {
               <Text size="sm" fw={600}>
                 {tool.label}
               </Text>
-              <Badge size="xs" variant="light" color={tool.source === "mcp" ? "cyan" : tool.source === "skill" ? "grape" : tool.source === "memory" ? "pink" : "brand"}>
+              <Badge size="xs" variant="light" color={tool.source === "mcp" ? "cyan" : tool.source === "skill" ? "grape" : tool.source === "memory" ? "pink" : tool.source === "agent" ? "orange" : "brand"}>
                 {sourceLabel[tool.source]}
               </Badge>
               <Badge size="xs" variant="dot" color={riskColor[tool.risk]}>

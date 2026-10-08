@@ -4,8 +4,11 @@ import { useChatStore } from "./ChatStore";
 import { useMcpStatus, callMcpTool, McpTool } from "./Mcp";
 import { enabledSkills, findSkill } from "./Skills";
 import { MEMORY_TOOLS } from "./Memory";
+import { AGENT_TOOLS } from "./Agent";
+import type { ProviderConnection } from "./Providers";
+import type { ChatCompletionParams } from "./OpenAI";
 
-export type ToolSource = "builtin" | "skill" | "mcp" | "memory";
+export type ToolSource = "builtin" | "skill" | "mcp" | "memory" | "agent";
 
 // read: only reads or computes. write: changes something that can be undone
 // or stays inside a sandbox. destructive: deletes, sends, pays or publishes
@@ -22,7 +25,21 @@ export interface ToolSpec {
   // memories): runs without approval in every mode, unless a rule says ask
   internal?: boolean;
   serverId?: string;
-  run: (args: Record<string, any>) => Promise<string>;
+  run: (args: Record<string, any>, context?: ToolContext) => Promise<string>;
+}
+
+// Where a tool call runs. The agent loop fills in everything; other callers
+// (e.g. realtime voice) only some of it
+export interface ToolContext {
+  callId: string;
+  chatId?: string;
+  signal?: AbortSignal;
+  // The running agent: lets tools such as run_subagent start their own loop
+  agent?: {
+    tools: ToolSpec[];
+    connection: ProviderConnection;
+    params: ChatCompletionParams;
+  };
 }
 
 const CALC_FUNCTIONS = [
@@ -163,6 +180,7 @@ export const allTools = (): ToolSpec[] => {
     ...BUILTIN_TOOLS,
     ...(enabledSkills().length > 0 ? [LOAD_SKILL_TOOL] : []),
     ...(useChatStore.getState().memoryEnabled ? MEMORY_TOOLS : []),
+    ...AGENT_TOOLS,
     ...mcpTools,
   ];
 };
@@ -186,7 +204,12 @@ export const toggleTool = (name: string) =>
       : [...state.disabledTools, name],
   }));
 
-export const runTool = async (tools: ToolSpec[], name: string, rawArgs: string) => {
+export const runTool = async (
+  tools: ToolSpec[],
+  name: string,
+  rawArgs: string,
+  context?: ToolContext
+) => {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`Unknown tool ${name}`);
   let args: Record<string, any> = {};
@@ -197,5 +220,5 @@ export const runTool = async (tools: ToolSpec[], name: string, rawArgs: string) 
       throw new Error(`Invalid JSON arguments: ${rawArgs.slice(0, 200)}`);
     }
   }
-  return tool.run(args);
+  return tool.run(args, context);
 };

@@ -1,0 +1,75 @@
+.card {
+  margin: 4px 0 16px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+}
+
+.chevron {
+  transition: transform 200ms ease;
+  flex-shrink: 0;
+
+  &[data-open] {
+    transform: rotate(180deg);
+  }
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 8px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  & li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: var(--mantine-font-size-sm);
+    unicode-bidi: plaintext;
+
+    & svg {
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+  }
+
+  & li[data-status="done"] span {
+    color: var(--mantine-color-dimmed);
+    text-decoration: line-through;
+  }
+
+  & li[data-status="in_progress"] span {
+    font-weight: 600;
+  }
+}
+
+.done {
+  color: var(--mantine-color-teal-5);
+}
+
+.pending {
+  color: var(--mantine-color-dimmed);
+}
+
+.spin {
+  color: var(--mantine-color-brand-4);
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

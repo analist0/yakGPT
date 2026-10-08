@@ -10,6 +10,7 @@ import MessageBubble from "./MessageBubble";
 import NewChat from "./NewChat";
 import Composer from "./Composer";
 import SummaryDivider from "./SummaryDivider";
+import PlanCard from "./PlanCard";
 import classes from "./ChatView.module.css";
 
 const nearBottom = () =>
@@ -73,6 +74,7 @@ export default function ChatView() {
                 )}
               </ErrorBoundary>
             ))}
+            {chat.plan && <PlanCard plan={chat.plan} />}
           </div>
         )}
       </div>

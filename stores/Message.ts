@@ -10,6 +10,8 @@ export interface ToolCall {
   result?: string;
   // pending: waiting for the user's approval
   status?: "running" | "pending" | "done" | "error" | "denied";
+  // Tool calls made by a sub-agent started with this call
+  subCalls?: ToolCall[];
 }
 
 export interface Message {

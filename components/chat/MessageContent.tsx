@@ -159,6 +159,13 @@ function ToolCallView({ call }: { call: ToolCall }) {
         </Group>
       </div>
     )}
+    {call.subCalls?.length ? (
+      <div className={classes.subCalls}>
+        {call.subCalls.map((sub) => (
+          <ToolCallView key={sub.id} call={sub} />
+        ))}
+      </div>
+    ) : null}
     </div>
   );
 }

@@ -111,3 +111,9 @@
     unicode-bidi: plaintext;
   }
 }
+
+.subCalls {
+  padding-inline-start: 18px;
+  border-inline-start: 2px solid var(--app-border-strong);
+  margin-inline-start: 10px;
+}

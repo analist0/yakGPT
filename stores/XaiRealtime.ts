@@ -457,7 +457,8 @@ export const startRealtime = async (router: NextRouter) => {
     if (!get().activeChatId) addChat(router);
     const chatId = get().activeChatId!;
 
-    const tools = activeTools();
+    // Planning and sub-agents need the text chat's agent loop
+    const tools = activeTools().filter((t) => t.source !== "agent");
     const model = settingsForm.realtime_model_xai || XAI_REALTIME_MODELS[0];
     const ws = new WebSocket(
       `wss://api.x.ai/v1/realtime?model=${encodeURIComponent(model)}`,
