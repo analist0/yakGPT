@@ -9,7 +9,15 @@ import { LogoMark } from "@/components/Logo";
 import MessageContent from "./MessageContent";
 import classes from "./MessageBubble.module.css";
 
-function MessageBubble({ message, showAvatar }: { message: Message; showAvatar: boolean }) {
+function MessageBubble({
+  message,
+  showAvatar,
+  showActions = true,
+}: {
+  message: Message;
+  showAvatar: boolean;
+  showActions?: boolean;
+}) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
@@ -37,7 +45,7 @@ function MessageBubble({ message, showAvatar }: { message: Message; showAvatar: 
         <div className={isUser ? classes.userBubble : classes.assistant}>
           <MessageContent message={message} />
         </div>
-        {!message.loading && message.role !== "system" && (
+        {showActions && !message.loading && message.role !== "system" && (
           <div className={classes.actions}>
             {message.content && (
               <Tooltip label={copied ? t("Copied", "הועתק") : t("Copy", "העתקה")}>

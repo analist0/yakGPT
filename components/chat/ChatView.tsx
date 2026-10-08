@@ -61,6 +61,11 @@ export default function ChatView() {
                   message={message}
                   // One avatar per run of assistant steps
                   showAvatar={chat.messages[index - 1]?.role !== message.role}
+                  // Actions go on the last step of an assistant run
+                  showActions={
+                    message.role !== "assistant" ||
+                    chat.messages[index + 1]?.role !== "assistant"
+                  }
                 />
               </ErrorBoundary>
             ))}

@@ -40,10 +40,11 @@ const authHeaders = (key: string | undefined): Record<string, string> =>
 
 export async function testKey(
   key: string | undefined,
-  baseUrl: string = OPENAI_BASE_URL
+  baseUrl: string = OPENAI_BASE_URL,
+  path = "/models"
 ): Promise<boolean> {
   try {
-    const res = await fetch(`${baseUrl}/models`, { headers: authHeaders(key) });
+    const res = await fetch(`${baseUrl}${path}`, { headers: authHeaders(key) });
     return res.ok;
   } catch {
     return false;

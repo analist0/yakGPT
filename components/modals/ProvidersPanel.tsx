@@ -197,7 +197,7 @@ export function ChatProviderCards() {
           field={providerKeyField[id]}
           keyUrl={providers[id].keyUrl}
           placeholder={id === "gemini" ? "AIza…" : id === "groq" ? "gsk_…" : id === "xai" ? "xai-…" : "sk-…"}
-          validate={(key) => testKeyOpenAI(key, providers[id].baseUrl)}
+          validate={(key) => testKeyOpenAI(key, providers[id].baseUrl, providers[id].keyCheckPath)}
           onSaved={() => activateProviderIfNeeded(id)}
         />
       ))}

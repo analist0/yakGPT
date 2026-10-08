@@ -24,6 +24,8 @@ interface ProviderInfo {
   name: string;
   baseUrl?: string;
   keyUrl?: string;
+  // Endpoint that rejects invalid keys (default /models)
+  keyCheckPath?: string;
   local?: boolean;
   // Keep only models that can be used for chat
   filterModels: (ids: string[]) => string[];
@@ -61,6 +63,8 @@ export const providers: Record<ProviderId, ProviderInfo> = {
     name: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
     keyUrl: "https://openrouter.ai/keys",
+    // The model list is public, so check the key itself
+    keyCheckPath: "/key",
     filterModels: (ids) => ids,
   },
   gemini: {

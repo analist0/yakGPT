@@ -1,10 +1,7 @@
 // Runs local (stdio) MCP servers on behalf of the browser.
 import type { NextApiRequest, NextApiResponse } from "next";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-  StdioClientTransport,
-  getDefaultEnvironment,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { requireLocal } from "@/lib/serverAccess";
 
 interface StdioConfig {
@@ -30,7 +27,12 @@ const getClient = (config: StdioConfig) => {
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args || [],
-        env: { ...getDefaultEnvironment(), ...(config.env || {}) },
+        // Pass the full environment: launchers like npx/uvx need the user's
+        // PATH, proxy and registry settings, which the SDK's minimal default drops
+        env: {
+          ...(process.env as Record<string, string>),
+          ...(config.env || {}),
+        },
         stderr: "pipe",
       });
       const c = new Client({ name: "yakgpt", version: "1.0.0" });
