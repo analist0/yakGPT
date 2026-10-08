@@ -10,6 +10,7 @@ A fast, private chat UI for every AI provider, local or in the cloud. Hebrew (ri
 - **MCP servers**: connect remote (HTTP) and local (stdio) Model Context Protocol servers, or import a Claude Desktop / Cursor `mcp.json`.
 - **Skills**: instruction packs the model loads on demand (`SKILL.md` or JSON import/export).
 - **Voice**: dictation (Whisper or Azure), read-aloud (OpenAI, Azure, ElevenLabs), and realtime speech-to-speech with Grok.
+- **Images (vision)**: attach, paste or drop images and ask vision models about them.
 - **Reasoning view**: thinking from reasoning models is shown in a collapsible block.
 - **Error monitoring**: in-app error log with JSON export, error boundaries, optional Sentry.
 - **Modern UI**: Next.js 16, React 19 and Mantine 9, light/dark themes, smooth animations, mobile friendly.
@@ -114,6 +115,10 @@ YakGPT finds it automatically. Open **Local models** to see your hardware, the m
 ### Realtime voice (Grok)
 
 With an xAI key set, the headset button in the composer starts a speech-to-speech conversation with Grok. Both sides are transcribed into the chat, and the chat's system prompt and recent messages are given to the voice model. When tools are on, Grok can call the same built-in tools, MCP tools and skills as the text chat; the calls appear in the chat as tool cards. Voice and model are under **Settings → Voice**.
+
+### Images
+
+Attach up to 8 images per message with the image button, by pasting (Ctrl+V) or by dropping them on the message box. They are scaled down to 1568 px and sent in the OpenAI image format, which OpenAI, Gemini, xAI, OpenRouter and vision models on Ollama (for example `gemma3`, `qwen2.5vl`) accept. Pick a vision model: others reject the request. Images are stored in the browser's IndexedDB, not in localStorage.
 
 ### Tools, skills and MCP
 

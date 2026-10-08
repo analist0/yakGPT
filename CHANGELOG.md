@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10 — Images and vision
+
+- **עברית:** אפשר לצרף תמונות להודעה, מכפתור, בהדבקה או בגרירה, ולשאול עליהן מודלים שתומכים בתמונות. התמונות מוקטנות, נשמרות בדפדפן ב־IndexedDB ומוצגות בצ'אט. לחיצה על תמונה פותחת אותה בגודל מלא.
+- `lib/images.ts`:
+  - scales images to at most 1568 px and re-encodes them as JPEG;
+  - stores them in IndexedDB (`yakgpt-images`);
+  - deletes unused images older than a day on startup.
+- `Message.images` holds image ids. `toApiMessages` sends user messages with images as OpenAI `text` + `image_url` content parts. `truncateMessages` counts about 1000 tokens per image.
+- Composer:
+  - attach button, paste and drag-and-drop;
+  - thumbnails with remove buttons;
+  - image-only messages;
+  - editing a message brings its images back.
+- Images show in the user bubble and open full size on click.
+- A 4xx error that mentions images suggests switching to a vision model.
+
 ## 2026-10 — Tools in realtime voice
 
 - **עברית:** בשיחה הקולית עם Grok אפשר עכשיו להשתמש באותם כלים כמו בצ'אט: הכלים המובנים, שרתי MCP וסקילים. כל קריאה לכלי מוצגת בצ'אט ככרטיס, והמודל עונה בקול עם התוצאה.

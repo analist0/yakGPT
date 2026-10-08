@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Message, truncateMessages, countTokens } from "./Message";
 import { getModelInfo } from "./Model";
 import { ProviderConnection } from "./Providers";
+import { loadImage } from "@/lib/images";
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
@@ -93,7 +94,8 @@ export interface CompletionResult {
 
 // Expand our messages into the API format: tool calls and their results are
 // stored on the assistant message and sent as assistant + tool messages.
-export const toApiMessages = (messages: Message[]) =>
+// imageUrls: data URLs of the messages' images, by id
+export const toApiMessages = (messages: Message[], imageUrls = new Map<string, string>()) =>
   messages.flatMap((m): Record<string, unknown>[] => {
     if (m.role === "assistant" && m.toolCalls?.length) {
       return [
@@ -115,8 +117,32 @@ export const toApiMessages = (messages: Message[]) =>
     }
     // Skip empty assistant placeholders
     if (m.role === "assistant" && !m.content.trim()) return [];
+    if (m.images?.length) {
+      const images = m.images.flatMap((id) => {
+        const url = imageUrls.get(id);
+        return url ? [{ type: "image_url", image_url: { url } }] : [];
+      });
+      const missing = m.images.length - images.length;
+      const text = [m.content, missing > 0 && `[${missing} attached image(s) no longer available]`]
+        .filter(Boolean)
+        .join("\n\n");
+      return [{ role: m.role, content: [...(text ? [{ type: "text", text }] : []), ...images] }];
+    }
     return [{ role: m.role, content: m.content }];
   });
+
+const loadImageUrls = async (messages: Message[]) => {
+  const ids = messages.flatMap((m) => m.images || []);
+  const entries = await Promise.all(
+    ids.map((id) =>
+      loadImage(id).then(
+        (url) => [id, url] as const,
+        () => undefined
+      )
+    )
+  );
+  return new Map(entries.filter((e) => e !== undefined));
+};
 
 export async function streamCompletion({
   messages,
@@ -147,7 +173,7 @@ export async function streamCompletion({
   const logitBias = JSON.parse(params.logit_bias || "{}");
   const payload = JSON.stringify({
     model: params.model,
-    messages: toApiMessages(submitMessages),
+    messages: toApiMessages(submitMessages, await loadImageUrls(submitMessages)),
     stream: true,
     temperature: params.temperature,
     top_p: params.top_p,

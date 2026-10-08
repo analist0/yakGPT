@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { v4 as uuidv4 } from "uuid";
 import { AnimatePresence, motion } from "motion/react";
@@ -19,6 +19,7 @@ import {
   IconHeadset,
   IconMicrophone,
   IconPencil,
+  IconPhoto,
   IconPlayerPause,
   IconPlayerPlay,
   IconPlayerStopFilled,
@@ -39,6 +40,9 @@ import { activeTools } from "@/stores/Tools";
 import { useMcpStatus } from "@/stores/Mcp";
 import { openModal } from "@/stores/Ui";
 import { useT } from "@/lib/i18n";
+import { MAX_IMAGES_PER_MESSAGE, prepareImage } from "@/lib/images";
+import { captureError } from "@/stores/ErrorLog";
+import StoredImage from "./StoredImage";
 import classes from "./Composer.module.css";
 
 function ToolsButton() {
@@ -115,6 +119,11 @@ export default function Composer() {
   const recording = audioState === "recording";
   const transcribing = audioState === "transcribing";
 
+  const images = useChatStore((state) => state.composerImages);
+  const [addingImages, setAddingImages] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
   const setValue = (text: string) => update({ textInputValue: text });
 
   useEffect(() => {
@@ -124,24 +133,62 @@ export default function Composer() {
   useEffect(() => {
     if (editingMessage) {
       setValue(editingMessage.content);
+      update({ composerImages: editingMessage.images || [] });
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [editingMessage]);
+
+  const addImages = async (files: File[]) => {
+    const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+    if (imageFiles.length === 0) return;
+    const room = MAX_IMAGES_PER_MESSAGE - useChatStore.getState().composerImages.length;
+    if (imageFiles.length > room) {
+      notifications.show({
+        color: "yellow",
+        message: t(
+          `Up to ${MAX_IMAGES_PER_MESSAGE} images per message`,
+          `עד ${MAX_IMAGES_PER_MESSAGE} תמונות בהודעה`
+        ),
+      });
+    }
+    const accepted = imageFiles.slice(0, Math.max(0, room));
+    setAddingImages((n) => n + accepted.length);
+    await Promise.all(
+      accepted.map(async (file) => {
+        try {
+          const id = await prepareImage(file);
+          update({ composerImages: [...useChatStore.getState().composerImages, id] });
+        } catch (error) {
+          captureError("ui", error, { details: file.name });
+          notifications.show({ color: "red", message: (error as Error).message });
+        } finally {
+          setAddingImages((n) => n - 1);
+        }
+      })
+    );
+  };
+
+  const removeImage = (id: string) =>
+    update({ composerImages: images.filter((image) => image !== id) });
+
+  const canSend = (!!value.trim() || images.length > 0) && addingImages === 0;
 
   const doSubmit = () => {
     if (loading) {
       abortCurrentRequest();
       return;
     }
-    if (!value.trim()) return;
+    if (!canSend) return;
     if (editingMessage) setEditingMessage(undefined);
     if (!activeChatId) addChat(router);
     submitMessage({
       id: editingMessage?.id || uuidv4(),
       content: value,
       role: editingMessage?.role || "user",
+      ...(images.length > 0 && { images }),
     });
     setValue("");
+    update({ composerImages: [] });
   };
 
   const toggleRecording = () => {
@@ -183,6 +230,7 @@ export default function Composer() {
                 onClick={() => {
                   setEditingMessage(undefined);
                   setValue("");
+                  update({ composerImages: [] });
                 }}
               >
                 <IconX size={12} />
@@ -191,7 +239,50 @@ export default function Composer() {
           )}
         </AnimatePresence>
 
-        <div className={classes.box} data-recording={recording || undefined}>
+        <div
+          className={classes.box}
+          data-recording={recording || undefined}
+          data-dragging={dragging || undefined}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+          }}
+          onDrop={(e) => {
+            if (!e.dataTransfer.files.length) return;
+            e.preventDefault();
+            setDragging(false);
+            addImages(Array.from(e.dataTransfer.files));
+          }}
+        >
+          {(images.length > 0 || addingImages > 0) && (
+            <div className={classes.attachments}>
+              {images.map((id) => (
+                <div key={id} className={classes.attachment}>
+                  <StoredImage id={id} className={classes.thumb} />
+                  <ActionIcon
+                    size="xs"
+                    radius="xl"
+                    variant="filled"
+                    color="dark"
+                    className={classes.removeImage}
+                    onClick={() => removeImage(id)}
+                    aria-label={t("Remove image", "הסרת תמונה")}
+                  >
+                    <IconX size={11} />
+                  </ActionIcon>
+                </div>
+              ))}
+              {Array.from({ length: addingImages }, (_, i) => (
+                <div key={`adding-${i}`} className={`${classes.thumb} ${classes.adding}`}>
+                  <Loader size="xs" />
+                </div>
+              ))}
+            </div>
+          )}
           <Textarea
             ref={inputRef}
             autosize
@@ -208,6 +299,13 @@ export default function Composer() {
             }
             value={value}
             onChange={(e) => setValue(e.currentTarget.value)}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.files);
+              if (files.some((f) => f.type.startsWith("image/"))) {
+                e.preventDefault();
+                addImages(files);
+              }
+            }}
             onKeyDown={(e) => {
               e.stopPropagation();
               if (!e.nativeEvent.isComposing && e.key === "Enter" && !e.shiftKey) {
@@ -220,6 +318,27 @@ export default function Composer() {
 
           <Group justify="space-between" gap={4} className={classes.toolbar} wrap="nowrap">
             <Group gap={4} wrap="nowrap">
+              <Tooltip label={t("Attach images", "צירוף תמונות")}>
+                <ActionIcon
+                  size="lg"
+                  color="gray"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label={t("Attach images", "צירוף תמונות")}
+                >
+                  <IconPhoto size={18} />
+                </ActionIcon>
+              </Tooltip>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  addImages(Array.from(e.currentTarget.files || []));
+                  e.currentTarget.value = "";
+                }}
+              />
               <ToolsButton />
               <Tooltip label={playerMode ? t("Stop reading aloud", "ביטול הקראה") : t("Read answers aloud", "הקראת תשובות")}>
                 <ActionIcon
@@ -297,7 +416,7 @@ export default function Composer() {
                 variant="gradient"
                 gradient={loading ? { from: "red.6", to: "pink.5" } : { from: "brand.6", to: "cyan.5", deg: 135 }}
                 className={classes.send}
-                data-ready={!!value.trim() || loading || undefined}
+                data-ready={canSend || loading || undefined}
                 onClick={doSubmit}
                 aria-label={loading ? t("Stop", "עצירה") : t("Send", "שליחה")}
               >

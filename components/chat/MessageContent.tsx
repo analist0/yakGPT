@@ -11,6 +11,7 @@ import {
 import { Message, ToolCall } from "@/stores/Message";
 import { useT } from "@/lib/i18n";
 import CodeBlock from "./CodeBlock";
+import MessageImages from "./MessageImages";
 import classes from "./MessageContent.module.css";
 
 const PassThrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
@@ -145,6 +146,7 @@ export default function MessageContent({ message }: { message: Message }) {
 
   return (
     <>
+      {message.images?.length ? <MessageImages ids={message.images} /> : null}
       {reasoning && (
         <Expandable
           icon={isThinking ? <Loader size={14} type="dots" /> : <IconBrain size={15} />}

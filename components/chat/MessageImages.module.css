@@ -1,0 +1,33 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  width: min(100%, 420px);
+  margin-bottom: 6px;
+}
+
+.grid[data-single] {
+  grid-template-columns: 1fr;
+  width: min(100%, 320px);
+}
+
+.image {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.grid[data-single] .image {
+  aspect-ratio: auto;
+  max-height: 320px;
+  height: auto;
+  object-fit: contain;
+}
+
+.full {
+  max-width: 90vw;
+  max-height: 85vh;
+  height: auto;
+  width: auto;
+  object-fit: contain;
+  border-radius: 0;
+}

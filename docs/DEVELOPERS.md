@@ -54,6 +54,7 @@ stores/                 # מצב (zustand) ולוגיקה, בלי UI
 lib/
   localModels.ts        # קטלוג מודלי Ollama + חישוב "מה נכנס בזיכרון"
   githubSkills.ts       # מציאת SKILL.md במאגר GitHub
+  images.ts             # תמונות מצורפות: הקטנה, שמירה ב־IndexedDB, ניקוי
   serverAccess.ts       # requireLocal(): נתיבי API רגישים עונים רק ל־loopback
   i18n.ts, theme.ts, characters.ts
 
@@ -134,7 +135,8 @@ scripts/
 
 | פיצ'ר | מצב |
 |---|---|
-| שליחת תמונה או קובץ למודל (vision) | ❌ אין צירוף קבצים. `Message.content` הוא מחרוזת בלבד |
+| שליחת תמונה למודל (vision) | 🟡 צירוף מכפתור, הדבקה או גרירה. נבדק מול שרת mock: התמונה מוקטנת ונשלחת כ־`image_url`, ונשמרת אחרי רענון. **לא נבדק מול מודל vision אמיתי.** ראו סעיף 6.2 א |
+| צירוף קבצים שאינם תמונה (PDF, טקסט) | ❌ |
 | יצירת תמונות | ❌ |
 | עריכת תמונות | ❌ |
 | יצירת וידאו (מטקסט או מתמונה) | ❌ |
@@ -205,11 +207,23 @@ scripts/
 
 ### 6.2 תמונות, וידאו, vision וניתוב אוטומטי
 
-**א. צירוף קבצים ו־vision (קודם לכול, כי שאר הסעיפים נשענים עליו):**
-- להרחיב את `Message` ל־`content: string | ContentPart[]` (טקסט ו־`image_url` כ־ data URL).
-- להוסיף צירוף והדבקה של תמונות ב־`Composer`.
-- רוב הספקים שלנו מקבלים תמונות בפורמט OpenAI: ‏GPT-4o/4.1/5, ‏Gemini, ‏Grok עם vision, ‏OpenRouter, ומודלי vision ב־Ollama כמו `gemma3` ו־`qwen2.5vl`.
-- `truncateMessages`, ‏`toApiMessages` והשמירה ב־localStorage צריכים להתמודד עם תמונות. localStorage מוגבל לכמה MB, ולכן תמונות כנראה יישמרו ב־IndexedDB.
+**א. צירוף תמונות ו־vision ✅ (בסיס)**
+
+מה נבנה:
+- **צירוף:** ב־`Composer` אפשר לצרף עד 8 תמונות להודעה: מכפתור התמונה, בהדבקה (Ctrl+V) או בגרירה. אפשר לשלוח תמונה גם בלי טקסט.
+- **הקטנה:** `lib/images.ts` מקטין כל תמונה כך שהצלע הארוכה היא עד 1568 פיקסלים, וממיר ל־JPEG באיכות 0.85. תמונות שקופות מקבלות רקע לבן.
+- **אחסון:** התמונות נשמרות ב־IndexedDB (`yakgpt-images`), ובהודעה נשמרים רק המזהים שלהן (`Message.images`). כך localStorage נשאר קטן. בעליית האפליקציה נמחקות תמונות שאף הודעה לא משתמשת בהן, אם הן בנות יותר מיום. הגיל המינימלי מגן על תמונה שמצורפת כרגע בלשונית אחרת.
+- **שליחה:** ‏`streamCompletion` טוען את התמונות, ו־`toApiMessages` שולח הודעת משתמש עם תמונות כמערך `[{type:"text"}, {type:"image_url", image_url:{url:"data:..."}}]`, הפורמט התואם OpenAI. תמונה שנמחקה מוחלפת בהערת טקסט.
+- **הערכת אורך:** `truncateMessages` מחשב כל תמונה כ־1000 טוקנים בערך.
+- **תצוגה:** התמונות מוצגות בבועת המשתמש, ולחיצה פותחת אותן בגודל מלא. בעריכת הודעה התמונות חוזרות לתיבת הכתיבה.
+- **מודל בלי vision:** אם הספק מחזיר 4xx שמזכיר תמונות, ההודעה למשתמש מציעה לבחור מודל vision.
+
+מה עוד חסר:
+- **בדיקה אמיתית:** לא נבדק מול מודל vision אמיתי. רוב הספקים מקבלים את הפורמט הזה: ‏GPT-4o/4.1/5, ‏Gemini, ‏Grok עם vision, ‏OpenRouter, ומודלי vision ב־Ollama כמו `gemma3` ו־`qwen2.5vl`. ב־Groq רק חלק מהמודלים, ויש להם מגבלת גודל לתמונה.
+- **אין סימון מראש:** לא מסומן אילו מודלים תומכים בתמונות. השגיאה מתגלה רק אחרי השליחה.
+- **קבצים אחרים:** אין צירוף של קבצים שאינם תמונה (PDF, טקסט).
+- **שיחה קולית:** לא רואה את התמונות.
+- **גיבוי:** התמונות נשמרות רק בדפדפן הזה. אם מנקים את נתוני האתר, הן נמחקות.
 
 **ב. יצירה ועריכה של תמונות, כ"כלים":**
 
@@ -251,7 +265,7 @@ scripts/
    - בדיקות יחידה (Vitest) ל־`parseSkillMarkdown`, ‏`parseGithubSource`, ‏`truncateMessages`, ‏`toApiMessages`, ‏`recommendModels` ופרסור ה־SSE.
    - Playwright לזרימות המרכזיות מול שרת mock. הסקריפטים ששימשו בפיתוח יכולים להוות בסיס.
 3. **CI:** להחליף את `docker-push.yml` ב־workflow שמריץ `yarn install --frozen-lockfile && yarn lint && yarn typecheck && yarn build` על כל PR.
-4. **אחסון:** להעביר שיחות ל־IndexedDB לפני שמוסיפים תמונות (מגבלת localStorage).
+4. **אחסון:** התמונות כבר ב־IndexedDB. אם השיחות עצמן יגדלו מעבר למגבלת localStorage, להעביר גם אותן.
 5. **קבצי קול ישנים** (`RecorderActions`, ‏`PlayerActions`, ‏`AzureRecorderActions`): עוד משתמשים ב־axios ובקוד מ־2023. לאחד תחת `captureError` ולבדוק מחדש.
 6. **קטלוג המודלים המקומיים** (`lib/localModels.ts`): סטטי. לשקול טעינה מ־ollama.com או עדכון ידני מתועד.
 7. **מחירים:** `stores/Model.ts` מכיל רק מחירי GPT ישנים. OpenRouter מחזיר מחירים ב־`/models`, ואפשר להשתמש בזה.
@@ -270,6 +284,7 @@ scripts/
 - [ ] MCP מרוחק (DeepWiki) ומקומי (`npx -y @modelcontextprotocol/server-filesystem <dir>`).
 - [ ] Windows: ‏`install.ps1` ואז `yakgpt.cmd`.
 - [ ] Termux על טלפון אמיתי: ‏`install.sh --ollama --boot`, ואז "הוסף למסך הבית".
+- [ ] תמונות: לצרף צילום מסך ולשאול עליו מודל vision (למשל `gpt-4o-mini`, ‏Gemini או `gemma3` ב־Ollama).
 - [ ] Sentry: שגיאה מגיעה ל־ DSN.
 
 ---

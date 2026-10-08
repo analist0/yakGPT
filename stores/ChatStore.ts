@@ -33,6 +33,7 @@ export const excludeFromState = [
   "playerAudioQueue",
   "playerIdx",
   "realtimeState",
+  "composerImages",
 ];
 
 interface SettingsForm {
@@ -140,6 +141,8 @@ export interface ChatState {
   playerApiState: APIState;
   playerAudioQueue: AudioChunk[];
   realtimeState: RealtimeState;
+  // Images attached in the composer, not sent yet
+  composerImages: string[];
 
   showTextDuringPTT: boolean;
   autoSendStreamingSTT: boolean;
@@ -196,6 +199,7 @@ export const initialState = {
   playerApiState: "idle",
   playerAudioQueue: [],
   realtimeState: "idle" as RealtimeState,
+  composerImages: [] as string[],
 
   autoSendStreamingSTT: true,
   modelChoicesChat: undefined,

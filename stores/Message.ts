@@ -20,6 +20,8 @@ export interface Message {
   reasoning?: string;
   // Function calls made by the assistant in this step, with their results
   toolCalls?: ToolCall[];
+  // Attached images (ids in lib/images.ts)
+  images?: string[];
 }
 
 const messageText = (message: Message) =>
@@ -27,6 +29,9 @@ const messageText = (message: Message) =>
   (message.toolCalls || [])
     .map((c) => c.arguments + (c.result || ""))
     .join("");
+
+// Rough cost of one attached image; providers count roughly 500-1600 tokens
+const IMAGE_TOKENS = 1000;
 
 // Helper function to estimate tokens
 function estimateTokens(content: string): number {
@@ -62,7 +67,8 @@ export function truncateMessages(
   // Try to truncate messages as is
   for (let i = messages.length - 1; i >= startIdx; i--) {
     const message = messages[i];
-    const tokens = estimateTokens(messageText(message));
+    const tokens =
+      estimateTokens(messageText(message)) + (message.images?.length || 0) * IMAGE_TOKENS;
     if (accumulatedTokens + tokens > targetTokens) {
       break;
     }

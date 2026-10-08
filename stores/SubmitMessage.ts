@@ -70,9 +70,17 @@ const isToolsUnsupported = (error: CompletionError) =>
   error.status < 500 &&
   /tool|function/i.test(error.message);
 
+// A 4xx that looks like the model rejecting image input
+const isImagesUnsupported = (error: unknown, chatId: string) =>
+  error instanceof CompletionError &&
+  error.status >= 400 &&
+  error.status < 500 &&
+  /image|vision|multimodal|image_url|content.*(array|type)/i.test(error.message) &&
+  !!getChatById(get().chats, chatId)?.messages.some((m) => m.images?.length);
+
 export const submitMessage = async (message: Message) => {
   // If message is empty, do nothing
-  if (message.content.trim() === "") {
+  if (message.content.trim() === "" && !message.images?.length) {
     console.error("Message is empty");
     return;
   }
@@ -185,7 +193,12 @@ export const submitMessage = async (message: Message) => {
       captureError("chat", error, {
         details: `${connection.baseUrl} · ${settings.model}`,
       });
-      notifications.show({ message: (error as Error).message, color: "red" });
+      notifications.show({
+        message: isImagesUnsupported(error, chat.id)
+          ? `${(error as Error).message}\n\n${settings.model} may not accept images. Pick a vision model (for example GPT-4o, Gemini, Grok with vision, or gemma3 / qwen2.5vl on Ollama).`
+          : (error as Error).message,
+        color: "red",
+      });
       updateMessageById(chat.id, assistantMsgId, (m) => {
         m.loading = false;
       });

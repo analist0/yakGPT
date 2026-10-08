@@ -106,3 +106,39 @@
     display: none;
   }
 }
+
+.box[data-dragging] {
+  border-color: var(--mantine-color-brand-5);
+  box-shadow: 0 0 0 4px rgba(120, 98, 253, 0.18);
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 6px;
+}
+
+.attachment {
+  position: relative;
+}
+
+.thumb {
+  width: 64px;
+  height: 64px;
+}
+
+.adding {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.removeImage {
+  position: absolute;
+  top: -6px;
+  inset-inline-end: -6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
