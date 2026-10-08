@@ -54,3 +54,10 @@
     transform: translateY(-1px);
   }
 }
+
+.checkRow {
+  padding: 8px 10px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+}

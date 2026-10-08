@@ -41,7 +41,7 @@ export default function ChatView() {
     if (chatId && stickToBottom.current) {
       window.scrollTo({ top: document.documentElement.scrollHeight });
     }
-  }, [chat?.messages.length, last?.content, last?.toolCalls, last?.reasoning]);
+  }, [chatId, chat?.messages.length, last?.content, last?.toolCalls, last?.reasoning]);
 
   useEffect(() => {
     stickToBottom.current = true;
