@@ -22,6 +22,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import {
   IconBook,
+  IconBrain,
   IconBrandGithub,
   IconDownload,
   IconPencil,
@@ -57,6 +58,7 @@ import {
 } from "@/stores/Skills";
 import { captureError } from "@/stores/ErrorLog";
 import GithubSkillsImport from "./GithubSkillsImport";
+import MemoryTab from "./MemoryTab";
 import { useT } from "@/lib/i18n";
 import classes from "./ToolsPanel.module.css";
 
@@ -73,6 +75,7 @@ function ToolsTab() {
     builtin: t("Built-in", "מובנה"),
     skill: t("Skills", "סקילים"),
     mcp: "MCP",
+    memory: t("Memory", "זיכרון"),
   };
   const riskLabel: Record<ToolRisk, string> = {
     read: t("Reads", "קורא"),
@@ -108,7 +111,7 @@ function ToolsTab() {
               <Text size="sm" fw={600}>
                 {tool.label}
               </Text>
-              <Badge size="xs" variant="light" color={tool.source === "mcp" ? "cyan" : tool.source === "skill" ? "grape" : "brand"}>
+              <Badge size="xs" variant="light" color={tool.source === "mcp" ? "cyan" : tool.source === "skill" ? "grape" : tool.source === "memory" ? "pink" : "brand"}>
                 {sourceLabel[tool.source]}
               </Badge>
               <Badge size="xs" variant="dot" color={riskColor[tool.risk]}>
@@ -591,12 +594,18 @@ export default function ToolsPanel({ defaultTab }: { defaultTab?: string }) {
         <Tabs.Tab value="skills" leftSection={<IconBook size={15} />}>
           {t("Skills", "סקילים")}
         </Tabs.Tab>
+        <Tabs.Tab value="memory" leftSection={<IconBrain size={15} />}>
+          {t("Memory", "זיכרון")}
+        </Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="tools">
         <ToolsTab />
       </Tabs.Panel>
       <Tabs.Panel value="mcp">
         <McpTab />
+      </Tabs.Panel>
+      <Tabs.Panel value="memory">
+        <MemoryTab />
       </Tabs.Panel>
       <Tabs.Panel value="skills">
         <SkillsTab />

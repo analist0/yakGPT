@@ -18,10 +18,11 @@ const autoRuns: Record<ApprovalMode, ToolRisk[]> = {
   free: ["read", "write", "destructive"],
 };
 
-export const needsApproval = (tool: Pick<ToolSpec, "name" | "risk">) => {
+export const needsApproval = (tool: Pick<ToolSpec, "name" | "risk" | "internal">) => {
   const { approvalMode, toolRules } = useChatStore.getState();
   const rule = toolRules[tool.name];
   if (rule) return rule === "ask";
+  if (tool.internal) return false;
   return !autoRuns[approvalMode].includes(tool.risk);
 };
 

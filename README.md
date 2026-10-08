@@ -9,6 +9,8 @@ A command center for AI: chat with every provider, local or in the cloud, and (c
 - **Tools**: models can call tools (current time, calculator, fetch a web page) and you see every call and result.
 - **MCP servers**: connect remote (HTTP) and local (stdio) Model Context Protocol servers, or import a Claude Desktop / Cursor `mcp.json`.
 - **Skills**: instruction packs the model loads on demand (`SKILL.md` or JSON import/export).
+- **Long-term memory**: the model saves facts about you (never passwords or keys) and sees them in every chat; view, edit and delete them under **Tools → Memory**.
+- **Long chats don't get cut off**: near the context limit, older messages are summarized once and the summary is sent instead; the chat shows where.
 - **Voice**: dictation (Whisper or Azure), read-aloud (OpenAI, Azure, ElevenLabs), and realtime speech-to-speech with Grok.
 - **Images (vision)**: attach, paste or drop images and ask vision models about them.
 - **Reasoning view**: thinking from reasoning models is shown in a collapsible block.

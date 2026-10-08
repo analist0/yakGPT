@@ -10,6 +10,9 @@ import { activeTools, runTool, toOpenAITools, ToolSpec } from "./Tools";
 import { skillsPrompt } from "./Skills";
 import { captureError } from "./ErrorLog";
 import { DECLINED_RESULT, needsApproval, requestApproval } from "./Approval";
+import { memoryPrompt } from "./Memory";
+import { compactIfNeeded, contextMessages, invalidateSummary, summaryPrompt } from "./Compaction";
+import { Chat } from "./Chat";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -53,9 +56,16 @@ const pushAssistantMessage = (chatId: string) => {
   return id;
 };
 
-// Skill list is appended to the chat's own system prompt, or sent as one
-const withSkills = (messages: Message[], tools: ToolSpec[]) => {
-  const prompt = tools.some((t) => t.name === "load_skill") && skillsPrompt();
+// Skills, memories and the summary of earlier messages go into the system
+// prompt: appended to the chat's own system message, or sent as one
+const withContext = (messages: Message[], tools: ToolSpec[], chat: Chat) => {
+  const prompt = [
+    tools.some((t) => t.name === "load_skill") && skillsPrompt(),
+    memoryPrompt(),
+    summaryPrompt(chat),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   if (!prompt) return messages;
   if (messages[0]?.role === "system") {
     return [
@@ -63,7 +73,7 @@ const withSkills = (messages: Message[], tools: ToolSpec[]) => {
       ...messages.slice(1),
     ];
   }
-  return [{ id: "skills", role: "system" as const, content: prompt }, ...messages];
+  return [{ id: "context", role: "system" as const, content: prompt }, ...messages];
 };
 
 const isToolsUnsupported = (error: CompletionError) =>
@@ -95,6 +105,7 @@ export const submitMessage = async (message: Message) => {
 
   // If this is an existing message, remove all the messages after it
   const index = chat.messages.findIndex((m) => m.id === message.id);
+  if (index !== -1) invalidateSummary(chat.id, message.id);
   set((state) => ({
     apiState: "loading",
     chats: updateChatMessages(state.chats, chat.id, (messages) => [
@@ -144,10 +155,26 @@ export const submitMessage = async (message: Message) => {
 
     // Offer tools until the last step, then force a text answer
     const offeredTools = step < MAX_TOOL_STEPS ? tools : [];
-    const history = withSkills(
-      getChatById(get().chats, chat.id)!.messages.filter((m) => m.id !== assistantMsgId),
-      offeredTools
-    );
+    // Summarize older messages when the history nears the context limit
+    try {
+      await compactIfNeeded({
+        chatId: chat.id,
+        exclude: assistantMsgId,
+        params: settings,
+        connection,
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.loading = false;
+        });
+        break;
+      }
+      captureError("chat", error, { details: "context compaction" });
+    }
+    const current = getChatById(get().chats, chat.id)!;
+    const history = withContext(contextMessages(current, assistantMsgId), offeredTools, current);
 
     let result;
     try {

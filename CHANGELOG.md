@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10 — Memory and context compaction
+
+- **עברית:**
+  - **זיכרון ארוך טווח:** המודל שומר עובדות עליך ורואה אותן בכל שיחה. אפשר לראות, לערוך ולמחוק אותן בלשונית "זיכרון", וסיסמאות ומפתחות אף פעם לא נשמרים.
+  - **שיחות ארוכות לא נחתכות:** כשהשיחה מתקרבת לגבול ההקשר, ההודעות הישנות מסוכמות, וקו בצ'אט מסמן מאיפה.
+  - **תוקן באג:** מודלים לא מוכרים (Gemini, ‏Llama, ‏Qwen ועוד) קיבלו הקשר של 4096 טוקנים בלבד, וההיסטוריה נחתכה מוקדם מדי.
+- `stores/Memory.ts`:
+  - `remember`, `update_memory` and `forget` tools, and a memory prompt for every chat and for realtime voice;
+  - credentials are refused;
+  - a **Memory** tab in the tools panel to view, edit and delete memories.
+- `ToolSpec.internal`: tools that only change Hamal's own user-visible data run without approval unless a tool rule says "ask".
+- `stores/Compaction.ts`:
+  - near 70% of the context window, older messages are summarized once and sent as a summary, and recent messages stay verbatim;
+  - the chat shows a divider where the summary applies;
+  - system prompts and approval rules are never summarized;
+  - editing or deleting a summarized message drops the summary.
+- `stores/Model.ts`: context sizes for Gemini, Claude, Llama, Qwen, Gemma, DeepSeek, Mistral and Kimi families; unknown models default to 32K instead of 4096.
+
 ## 2026-10 — New name: Hamal (חמ״ל)
 
 - **עברית:** הפרויקט נקרא עכשיו **חמ״ל**: חדר פיקוד לבינה מלאכותית, ובהמשך לצוות סוכנים. השם הוחלף בממשק, באייקון של האפליקציה, במסמכים ובסקריפטי ההתקנה. פקודת ההפעלה היא עכשיו `hamal`, וב־Windows ‏`hamal.cmd`. השיחות, המפתחות וההגדרות נשמרים: מפתחות השמירה בדפדפן לא השתנו.

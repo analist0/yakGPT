@@ -3,8 +3,9 @@
 import { useChatStore } from "./ChatStore";
 import { useMcpStatus, callMcpTool, McpTool } from "./Mcp";
 import { enabledSkills, findSkill } from "./Skills";
+import { MEMORY_TOOLS } from "./Memory";
 
-export type ToolSource = "builtin" | "skill" | "mcp";
+export type ToolSource = "builtin" | "skill" | "mcp" | "memory";
 
 // read: only reads or computes. write: changes something that can be undone
 // or stays inside a sandbox. destructive: deletes, sends, pays or publishes
@@ -17,6 +18,9 @@ export interface ToolSpec {
   parameters: Record<string, unknown>;
   source: ToolSource;
   risk: ToolRisk;
+  // Only changes Hamal's own data that the user can see and undo (e.g.
+  // memories): runs without approval in every mode, unless a rule says ask
+  internal?: boolean;
   serverId?: string;
   run: (args: Record<string, any>) => Promise<string>;
 }
@@ -158,6 +162,7 @@ export const allTools = (): ToolSpec[] => {
   return [
     ...BUILTIN_TOOLS,
     ...(enabledSkills().length > 0 ? [LOAD_SKILL_TOOL] : []),
+    ...(useChatStore.getState().memoryEnabled ? MEMORY_TOOLS : []),
     ...mcpTools,
   ];
 };

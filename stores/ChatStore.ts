@@ -9,6 +9,7 @@ import { ProviderId } from "./Providers";
 import type { McpServerConfig } from "./Mcp";
 import type { Skill } from "./Skills";
 import type { ApprovalMode, ToolRule } from "./Approval";
+import type { Memory } from "./Memory";
 
 export type APIState = "idle" | "loading" | "error";
 export type RealtimeState = "idle" | "connecting" | "active";
@@ -161,6 +162,8 @@ export interface ChatState {
   skills: Skill[];
   approvalMode: ApprovalMode;
   toolRules: Record<string, ToolRule>;
+  memoryEnabled: boolean;
+  memories: Memory[];
 }
 export const initialState = {
   apiState: "idle" as APIState,
@@ -220,6 +223,8 @@ export const initialState = {
   skills: [] as Skill[],
   approvalMode: "normal" as ApprovalMode,
   toolRules: {} as Record<string, ToolRule>,
+  memoryEnabled: true,
+  memories: [] as Memory[],
 };
 
 const store = () => ({ ...initialState } as ChatState);

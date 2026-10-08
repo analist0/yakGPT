@@ -65,7 +65,7 @@ export async function fetchModels(
   return (data.data || data.models || []).map((model: any) => model.id || model.name);
 }
 
-interface ChatCompletionParams {
+export interface ChatCompletionParams {
   model: string;
   temperature: number;
   top_p: number;

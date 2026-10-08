@@ -34,6 +34,9 @@ const messageText = (message: Message) =>
 // Rough cost of one attached image; providers count roughly 500-1600 tokens
 const IMAGE_TOKENS = 1000;
 
+export const estimateMessageTokens = (message: Message) =>
+  estimateTokens(messageText(message)) + (message.images?.length || 0) * IMAGE_TOKENS;
+
 // Helper function to estimate tokens
 function estimateTokens(content: string): number {
   const words = content.trim().split(/\s+/).length;
@@ -68,8 +71,7 @@ export function truncateMessages(
   // Try to truncate messages as is
   for (let i = messages.length - 1; i >= startIdx; i--) {
     const message = messages[i];
-    const tokens =
-      estimateTokens(messageText(message)) + (message.images?.length || 0) * IMAGE_TOKENS;
+    const tokens = estimateMessageTokens(message);
     if (accumulatedTokens + tokens > targetTokens) {
       break;
     }

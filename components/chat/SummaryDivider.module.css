@@ -1,0 +1,29 @@
+.root {
+  margin: 8px 0 16px;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  color: var(--mantine-color-dimmed);
+
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    border-top: 1px dashed var(--app-border-strong);
+  }
+}
+
+.text {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: var(--mantine-radius-md);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  white-space: pre-wrap;
+  unicode-bidi: plaintext;
+}

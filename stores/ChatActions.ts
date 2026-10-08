@@ -1,3 +1,4 @@
+import { invalidateSummary } from "./Compaction";
 import { v4 as uuidv4 } from "uuid";
 import { Message } from "./Message";
 import { Chat } from "./Chat";
@@ -79,6 +80,7 @@ export const delMessage = (message: Message) => {
     console.error("Chat not found");
     return;
   }
+  invalidateSummary(chat.id, message.id);
   set((state) => ({
     chats: updateChatMessages(state.chats, chat.id, (messages) => {
       return messages.filter((m) => m.id !== message.id);

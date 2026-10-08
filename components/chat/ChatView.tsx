@@ -9,6 +9,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import MessageBubble from "./MessageBubble";
 import NewChat from "./NewChat";
 import Composer from "./Composer";
+import SummaryDivider from "./SummaryDivider";
 import classes from "./ChatView.module.css";
 
 const nearBottom = () =>
@@ -67,6 +68,9 @@ export default function ChatView() {
                     chat.messages[index + 1]?.role !== "assistant"
                   }
                 />
+                {chat.summary?.throughId === message.id && (
+                  <SummaryDivider summary={chat.summary} />
+                )}
               </ErrorBoundary>
             ))}
           </div>

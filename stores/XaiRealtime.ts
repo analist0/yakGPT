@@ -11,6 +11,8 @@ import { addChat } from "./ChatActions";
 import { captureError } from "./ErrorLog";
 import { activeTools, runTool, ToolSpec } from "./Tools";
 import { skillsPrompt } from "./Skills";
+import { memoryPrompt } from "./Memory";
+import { summaryPrompt } from "./Compaction";
 import { DECLINED_RESULT, needsApproval, requestApproval } from "./Approval";
 
 const get = useChatStore.getState;
@@ -132,6 +134,8 @@ const buildInstructions = (chatId: string, tools: ToolSpec[]) => {
     systemPrompt || "You are a helpful assistant. Keep spoken answers short.",
     toolHint,
     skills,
+    memoryPrompt(),
+    chat && summaryPrompt(chat),
     history && `Conversation so far:\n${history}`,
   ]
     .filter(Boolean)
