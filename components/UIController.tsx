@@ -8,6 +8,7 @@ import {
   IconPlayerPause,
   IconVolumeOff,
   IconVolume,
+  IconHeadset,
 } from "@tabler/icons-react";
 import ChatTextInput from "./ChatTextInput";
 import { useRouter } from "next/router";
@@ -20,6 +21,7 @@ import {
   setPushToTalkMode,
 } from "@/stores/ChatActions";
 import { toggleAudio } from "@/stores/PlayerActions";
+import { toggleRealtime } from "@/stores/XaiRealtime";
 
 const styles = createStyles((theme: MantineTheme) => ({
   container: {
@@ -162,6 +164,38 @@ const ChatInput = () => {
   );
 };
 
+// Speech-to-speech conversation with Grok
+const RealtimeButton = () => {
+  const router = useRouter();
+  const apiKeyXai = useChatStore((state) => state.apiKeyXai);
+  const realtimeState = useChatStore((state) => state.realtimeState);
+
+  if (!apiKeyXai) return null;
+
+  return (
+    <Button
+      sx={{ height: 72, width: 48, borderRadius: 0 }}
+      compact
+      title={
+        realtimeState === "idle"
+          ? "Start realtime voice (Grok)"
+          : "Stop realtime voice"
+      }
+      variant={realtimeState === "idle" ? "light" : "filled"}
+      color={realtimeState === "idle" ? undefined : "red"}
+      onClick={() => toggleRealtime(router)}
+    >
+      {realtimeState === "connecting" ? (
+        <Loader size="1.5em" color="white" />
+      ) : realtimeState === "active" ? (
+        <Loader size="1.5em" variant="bars" color="white" />
+      ) : (
+        <IconHeadset size="1.5em" />
+      )}
+    </Button>
+  );
+};
+
 const RecorderControls = () => {
   const { classes } = styles();
 
@@ -221,6 +255,7 @@ export default function UIController() {
     <div className={classes.container}>
       <PlayerControls />
       <ChatInput />
+      <RealtimeButton />
       <RecorderControls />
     </div>
   );

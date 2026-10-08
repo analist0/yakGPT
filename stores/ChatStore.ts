@@ -8,6 +8,7 @@ import { OPENAI_TTS_VOICES } from "./OpenAI";
 import { ProviderId } from "./Providers";
 
 export type APIState = "idle" | "loading" | "error";
+export type RealtimeState = "idle" | "connecting" | "active";
 export type AudioState = "idle" | "recording" | "transcribing" | "processing";
 
 export const excludeFromState = [
@@ -28,6 +29,7 @@ export const excludeFromState = [
   "playerState",
   "playerAudioQueue",
   "playerIdx",
+  "realtimeState",
 ];
 
 interface SettingsForm {
@@ -49,6 +51,9 @@ interface SettingsForm {
   // OpenAI TTS
   voice_id_openai: string;
   tts_model_openai: string;
+  // xAI realtime voice
+  voice_id_xai: string;
+  realtime_model_xai: string;
   // ElevenLabs
   voice_id: string;
   // Azure
@@ -78,6 +83,9 @@ export const defaultSettings = {
   // OpenAI TTS
   voice_id_openai: OPENAI_TTS_VOICES[0],
   tts_model_openai: "tts-1",
+  // xAI realtime voice
+  voice_id_xai: "ara",
+  realtime_model_xai: "grok-voice-latest",
   // ElevenLabs
   voice_id: "21m00Tcm4TlvDq8ikWAM",
   // Azure
@@ -125,6 +133,7 @@ export interface ChatState {
   playerState: "playing" | "paused" | "idle";
   playerApiState: APIState;
   playerAudioQueue: AudioChunk[];
+  realtimeState: RealtimeState;
 
   showTextDuringPTT: boolean;
   autoSendStreamingSTT: boolean;
@@ -169,6 +178,7 @@ export const initialState = {
   playerState: "idle",
   playerApiState: "idle",
   playerAudioQueue: [],
+  realtimeState: "idle" as RealtimeState,
 
   autoSendStreamingSTT: true,
   modelChoicesChat: undefined,

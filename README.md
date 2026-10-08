@@ -78,6 +78,8 @@ Ollama has to allow requests from the app's origin, for example:
 $ OLLAMA_ORIGINS=http://localhost:3000 ollama serve
 ```
 
+With an xAI key set, the headset button next to the chat input starts a realtime voice conversation with Grok (speech in, speech out, with server-side turn detection so you can interrupt it). Both sides are transcribed into the current chat, and the chat's system prompt and recent messages are given to the voice model as context. Voice and model are under **Settings → xAI Voice**.
+
 They can also be set in `.env.local`:
 
 ```
