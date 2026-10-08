@@ -1,7 +1,7 @@
 {
-  "name": "YakGPT",
-  "short_name": "YakGPT",
-  "description": "A fast, private chat UI for every AI provider",
+  "name": "Hamal חמ״ל",
+  "short_name": "Hamal",
+  "description": "Command center for AI agents and every AI provider",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

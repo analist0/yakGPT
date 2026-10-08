@@ -42,7 +42,7 @@ if (host !== "127.0.0.1" && host !== "localhost") {
     `Listening on ${host}. Local MCP servers, hardware detection and fetch_url still only answer this machine unless YAKGPT_LOCAL_FEATURES=1.`
   );
 }
-console.log(`YakGPT: ${url}`);
+console.log(`Hamal: ${url}`);
 
 if (args.includes("--open")) {
   const opener =

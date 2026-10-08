@@ -37,3 +37,5 @@ yarn-error.log*
 next-env.d.ts
 
 /audiofiles/yakgpt.cmd
+/hamal.cmd
+/yakgpt.cmd

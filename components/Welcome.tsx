@@ -36,7 +36,7 @@ export default function Welcome() {
           <div>
             <Title order={2} className={classes.title}>
               {t("Welcome to ", "ברוכים הבאים ל־")}
-              <span className="gradient-text">YakGPT</span>
+              <span className="gradient-text">{t("Hamal", "חמ״ל")}</span>
             </Title>
             <Text size="sm" c="dimmed">
               {t("Every AI model in one fast, private place", "כל מודלי הבינה המלאכותית במקום אחד, מהיר ופרטי")}

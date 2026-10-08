@@ -300,7 +300,7 @@ export default function Composer() {
                 ? t("Listening…", "מקשיב…")
                 : transcribing
                 ? t("Transcribing…", "מתמלל…")
-                : t("Message YakGPT…", "כתוב הודעה…")
+                : t("Message Hamal…", "כתוב הודעה…")
             }
             value={value}
             onChange={(e) => setValue(e.currentTarget.value)}

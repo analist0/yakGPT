@@ -1,11 +1,11 @@
-# YakGPT
+# Hamal (חמ״ל)
 
-A fast, private chat UI for every AI provider, local or in the cloud. Hebrew (right-to-left) and English interface.
+A command center for AI: chat with every provider, local or in the cloud, and (coming) a team of agents led by a main agent. Hebrew (right-to-left) and English interface. Hamal started as a fork of [YakGPT](https://github.com/yakGPT/yakGPT).
 
 ## Features
 
 - **Every major provider**: OpenAI, xAI (Grok), Groq, OpenRouter, Google Gemini, and local models through Ollama. Switch provider and model from the picker at the top.
-- **Local models that fit your machine**: on first launch YakGPT detects your CPU, RAM and GPU, suggests Ollama models that will run well, and downloads them with live progress.
+- **Local models that fit your machine**: on first launch Hamal detects your CPU, RAM and GPU, suggests Ollama models that will run well, and downloads them with live progress.
 - **Tools**: models can call tools (current time, calculator, fetch a web page) and you see every call and result.
 - **MCP servers**: connect remote (HTTP) and local (stdio) Model Context Protocol servers, or import a Claude Desktop / Cursor `mcp.json`.
 - **Skills**: instruction packs the model loads on demand (`SKILL.md` or JSON import/export).
@@ -28,7 +28,7 @@ A fast, private chat UI for every AI provider, local or in the cloud. Hebrew (ri
 
 ## 🚀 Getting Started
 
-Visit [YakGPT](https://yakgpt.vercel.app) to try it out without installing, or follow these steps to run it locally:
+Follow these steps to run Hamal on your machine:
 
 ### Prerequisites
 
@@ -38,14 +38,14 @@ Visit [YakGPT](https://yakgpt.vercel.app) to try it out without installing, or f
 
 ### Installation
 
-The install scripts check Node.js (20.9+), install dependencies, build, and create a `yakgpt` launcher. The app listens on `127.0.0.1:3000` only, so it isn't reachable from your network unless you pass `--host 0.0.0.0`.
+The install scripts check Node.js (20.9+), install dependencies, build, and create a `hamal` launcher. The app listens on `127.0.0.1:3000` only, so it isn't reachable from your network unless you pass `--host 0.0.0.0`.
 
 **Linux / macOS**
 
 ```
 $ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
 $ ./scripts/install.sh            # add --ollama to also install Ollama
-$ yakgpt --open
+$ hamal --open
 ```
 
 **Windows** (PowerShell)
@@ -55,7 +55,7 @@ $ yakgpt --open
 > powershell -ExecutionPolicy Bypass -File scripts\install.ps1   # add -Ollama to also install Ollama
 ```
 
-Then double-click `yakgpt.cmd`. If Node.js is missing, the script installs it with `winget`.
+Then double-click `hamal.cmd`. If Node.js is missing, the script installs it with `winget`.
 
 **Android (Termux)**
 
@@ -65,12 +65,12 @@ Install [Termux](https://f-droid.org/packages/com.termux/) from F-Droid (the Pla
 $ pkg install -y git
 $ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
 $ ./scripts/install.sh --ollama --boot
-$ yakgpt --open
+$ hamal --open
 ```
 
 - **Building:** the script installs Node.js with `pkg` and builds with webpack, since Next.js has no native compiler for Android.
-- **Add to Home screen:** in the browser, add YakGPT to the home screen and it opens as a standalone app.
-- **Start at boot:** `--boot` starts YakGPT when the phone boots. It needs the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) app.
+- **Add to Home screen:** in the browser, add Hamal to the home screen and it opens as a standalone app.
+- **Start at boot:** `--boot` starts Hamal when the phone boots. It needs the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) app.
 - **Keep it running:** run `termux-wake-lock`, otherwise Android may stop the server in the background.
 - **Local models:** on a phone, small models (1–4B parameters) are the realistic choice.
 
@@ -110,7 +110,7 @@ Install [Ollama](https://ollama.com) and start it so the app's origin may call i
 $ OLLAMA_ORIGINS=http://localhost:3000 ollama serve
 ```
 
-YakGPT finds it automatically. Open **Local models** to see your hardware, the models that fit, and to download or remove models.
+Hamal finds it automatically. Open **Local models** to see your hardware, the models that fit, and to download or remove models.
 
 ### Realtime voice (Grok)
 
@@ -140,26 +140,18 @@ Local MCP servers, hardware detection and the `fetch_url` tool run on the server
 
 ## 🐳 Docker
 
-To use the pre-built Docker image from Docker Hub (only for amd64), run:
+Build and run the image:
 
 ```
-$ docker run -it -p 3000:3000 yakgpt/yakgpt:latest
-```
-
----
-
-To build the Docker image yourself (such as if you're on arm64), run:
-
-```
-$ docker build -t yakgpt:latest .
-$ docker run -it -p 127.0.0.1:3000:3000 -e YAKGPT_LOCAL_FEATURES=1 yakgpt:latest
+$ docker build -t hamal:latest .
+$ docker run -it -p 127.0.0.1:3000:3000 -e YAKGPT_LOCAL_FEATURES=1 hamal:latest
 ```
 
 `YAKGPT_LOCAL_FEATURES=1` enables local MCP servers and hardware detection inside the container (see above); binding to `127.0.0.1` keeps the port private to your machine. Hardware detection then reports the container's view of the machine.
 
 ## 🎤 Microphone Integration
 
-YakGPT makes chatting a breeze with its microphone integration! Activate your microphone using your browser's permissions, and YakGPT will automatically convert your speech into text.
+Hamal makes chatting a breeze with its microphone integration! Activate your microphone using your browser's permissions, and Hamal will automatically convert your speech into text.
 
 You can also toggle the mic integration as needed by clicking on the microphone icon in the app.
 
@@ -167,7 +159,7 @@ Remember to use a supported web browser and ensure your microphone is functionin
 
 ## 🛡️ Data Privacy and Security
 
-YakGPT uses your own API keys. Chats and keys are stored in your browser, and requests go directly from your browser to the provider you chose. The YakGPT server is only involved for local MCP servers, hardware detection and the `fetch_url` tool.
+Hamal uses your own API keys. Chats and keys are stored in your browser, and requests go directly from your browser to the provider you chose. The Hamal server is only involved for local MCP servers, hardware detection and the `fetch_url` tool.
 
 ## 👩‍💻 For developers
 

@@ -70,12 +70,12 @@ const connectHttp = async (config: McpServerConfig) => {
   const url = new URL(config.url!);
   const requestInit = { headers: config.headers || {} };
 
-  const client = new Client({ name: "yakgpt", version: "1.0.0" });
+  const client = new Client({ name: "hamal", version: "1.0.0" });
   try {
     await client.connect(new StreamableHTTPClientTransport(url, { requestInit }));
   } catch (streamableError) {
     // Older servers only speak the SSE transport
-    const sseClient = new Client({ name: "yakgpt", version: "1.0.0" });
+    const sseClient = new Client({ name: "hamal", version: "1.0.0" });
     try {
       await sseClient.connect(new SSEClientTransport(url, { requestInit }));
     } catch {

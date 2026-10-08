@@ -298,8 +298,8 @@ function McpTab() {
     <Stack gap="md">
       <Text size="sm" c="dimmed">
         {t(
-          "Connect Model Context Protocol servers to give the model new tools. Remote servers connect from the browser; local (stdio) servers run on the machine serving YakGPT.",
-          "חבר שרתי Model Context Protocol כדי לתת למודל כלים חדשים. שרתים מרוחקים מתחברים מהדפדפן; שרתים מקומיים (stdio) רצים על המחשב שמריץ את YakGPT."
+          "Connect Model Context Protocol servers to give the model new tools. Remote servers connect from the browser; local (stdio) servers run on the machine serving Hamal.",
+          "חבר שרתי Model Context Protocol כדי לתת למודל כלים חדשים. שרתים מרוחקים מתחברים מהדפדפן; שרתים מקומיים (stdio) רצים על המחשב שמריץ את חמ״ל."
         )}
       </Text>
 
@@ -423,8 +423,8 @@ function McpTab() {
       <Alert variant="light" color="gray">
         <Text size="xs">
           {t(
-            "Local servers only run when YakGPT is opened from the same machine, or when the server sets",
-            "שרתים מקומיים רצים רק כש־YakGPT נפתח מאותו מחשב, או כשהשרת מוגדר עם"
+            "Local servers only run when Hamal is opened from the same machine, or when the server sets",
+            "שרתים מקומיים רצים רק כשחמ״ל נפתח מאותו מחשב, או כשהשרת מוגדר עם"
           )}{" "}
           <Code>YAKGPT_LOCAL_FEATURES=1</Code>
         </Text>

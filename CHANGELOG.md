@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10 — New name: Hamal (חמ״ל)
+
+- **עברית:** הפרויקט נקרא עכשיו **חמ״ל**: חדר פיקוד לבינה מלאכותית, ובהמשך לצוות סוכנים. השם הוחלף בממשק, באייקון של האפליקציה, במסמכים ובסקריפטי ההתקנה. פקודת ההפעלה היא עכשיו `hamal`, וב־Windows ‏`hamal.cmd`. השיחות, המפתחות וההגדרות נשמרים: מפתחות השמירה בדפדפן לא השתנו.
+- Kept on purpose:
+  - browser storage keys (`chat-store-v23`, `yakgpt-images`, `yakgpt-error-log`), so nothing is lost;
+  - the `YAKGPT_*` environment variables.
+- README no longer points to upstream's hosted site and Docker Hub image, which don't include these changes.
+
 ## 2026-10 — Tool approval
 
 - **עברית:** אפשר לבחור מתי המודל צריך לבקש אישור לפני שהוא מפעיל כלי. יש שלושה מצבים:

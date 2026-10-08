@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (YakGPT fetch_url tool)" },
+      headers: { "User-Agent": "Mozilla/5.0 (Hamal fetch_url tool)" },
       signal: AbortSignal.timeout(15000),
     });
     const type = response.headers.get("content-type") || "";

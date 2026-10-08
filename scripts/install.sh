@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Installs and builds YakGPT on Linux, macOS or Android (Termux).
+# Installs and builds Hamal on Linux, macOS or Android (Termux).
 #
 #   ./scripts/install.sh            install dependencies and build
 #   ./scripts/install.sh --ollama   also install Ollama for local models
-#   ./scripts/install.sh --boot     Termux: start YakGPT when the phone boots
+#   ./scripts/install.sh --boot     Termux: start Hamal when the phone boots
 #                                   (needs the Termux:Boot app)
 #
-# Afterwards run `yakgpt` (or `node scripts/start.mjs`) and open
+# Afterwards run `hamal` (or `node scripts/start.mjs`) and open
 # http://localhost:3000
 set -euo pipefail
 
@@ -75,7 +75,7 @@ else
   "${YARN[@]}" build
 fi
 
-# 4. A `yakgpt` command
+# 4. A `hamal` command
 if [ "$IS_TERMUX" -eq 1 ]; then
   BIN_DIR="$PREFIX/bin"
 else
@@ -87,15 +87,15 @@ if [ "$IS_TERMUX" -eq 1 ]; then
 else
   SHEBANG="#!/usr/bin/env bash"
 fi
-cat > "$BIN_DIR/yakgpt" <<EOF
+cat > "$BIN_DIR/hamal" <<EOF
 $SHEBANG
 exec node "$ROOT/scripts/start.mjs" "\$@"
 EOF
-chmod +x "$BIN_DIR/yakgpt"
-info "Created $BIN_DIR/yakgpt"
+chmod +x "$BIN_DIR/hamal"
+info "Created $BIN_DIR/hamal"
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
-  *) warn "$BIN_DIR is not on your PATH; run $BIN_DIR/yakgpt or add it to PATH" ;;
+  *) warn "$BIN_DIR is not on your PATH; run $BIN_DIR/hamal or add it to PATH" ;;
 esac
 
 # 5. Optional: Ollama for local models
@@ -123,19 +123,19 @@ if [ "$WITH_BOOT" -eq 1 ]; then
     if [ "$WITH_OLLAMA" -eq 1 ]; then
       OLLAMA_LINE='ollama serve > "$HOME/ollama.log" 2>&1 &'
     fi
-    cat > "$HOME/.termux/boot/yakgpt" <<EOF
+    cat > "$HOME/.termux/boot/hamal" <<EOF
 #!/data/data/com.termux/files/usr/bin/sh
 termux-wake-lock
 $OLLAMA_LINE
-node "$ROOT/scripts/start.mjs" > "\$HOME/yakgpt.log" 2>&1
+node "$ROOT/scripts/start.mjs" > "\$HOME/hamal.log" 2>&1
 EOF
-    chmod +x "$HOME/.termux/boot/yakgpt"
-    info "YakGPT will start when the phone boots (requires the Termux:Boot app from F-Droid)"
+    chmod +x "$HOME/.termux/boot/hamal"
+    info "Hamal will start when the phone boots (requires the Termux:Boot app from F-Droid)"
   fi
 fi
 
 echo
-info "Done. Start YakGPT with:  yakgpt --open"
+info "Done. Start Hamal with:  hamal --open"
 if [ "$IS_TERMUX" -eq 1 ]; then
   echo "    Then open http://localhost:3000 in your browser and use \"Add to Home screen\"."
   echo "    Tip: run termux-wake-lock so Android doesn't stop it in the background."

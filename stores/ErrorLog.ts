@@ -128,7 +128,7 @@ export const exportErrors = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `yakgpt-errors-${Date.now()}.json`;
+  a.download = `hamal-errors-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 };
