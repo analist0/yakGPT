@@ -1,15 +1,19 @@
-# YakGPT
+# Hamal (חמ״ל)
 
-A fast, private chat UI for every AI provider, local or in the cloud. Hebrew (right-to-left) and English interface.
+A command center for AI: chat with every provider, local or in the cloud, and (coming) a team of agents led by a main agent. Hebrew (right-to-left) and English interface. Hamal started as a fork of [YakGPT](https://github.com/yakGPT/yakGPT).
 
 ## Features
 
 - **Every major provider**: OpenAI, xAI (Grok), Groq, OpenRouter, Google Gemini, and local models through Ollama. Switch provider and model from the picker at the top.
-- **Local models that fit your machine**: on first launch YakGPT detects your CPU, RAM and GPU, suggests Ollama models that will run well, and downloads them with live progress.
+- **Local models that fit your machine**: on first launch Hamal detects your CPU, RAM and GPU, suggests Ollama models that will run well, and downloads them with live progress.
 - **Tools**: models can call tools (current time, calculator, fetch a web page) and you see every call and result.
 - **MCP servers**: connect remote (HTTP) and local (stdio) Model Context Protocol servers, or import a Claude Desktop / Cursor `mcp.json`.
 - **Skills**: instruction packs the model loads on demand (`SKILL.md` or JSON import/export).
+- **Planning and sub-agents**: for multi-step tasks the model keeps a visible task list and hands independent subtasks to sub-agents that run in parallel, each in its own context; their tool calls go through the same approvals.
+- **Long-term memory**: the model saves facts about you (never passwords or keys) and sees them in every chat; view, edit and delete them under **Tools → Memory**.
+- **Long chats don't get cut off**: near the context limit, older messages are summarized once and the summary is sent instead; the chat shows where.
 - **Voice**: dictation (Whisper or Azure), read-aloud (OpenAI, Azure, ElevenLabs), and realtime speech-to-speech with Grok.
+- **Images (vision)**: attach, paste or drop images and ask vision models about them.
 - **Reasoning view**: thinking from reasoning models is shown in a collapsible block.
 - **Error monitoring**: in-app error log with JSON export, error boundaries, optional Sentry.
 - **Modern UI**: Next.js 16, React 19 and Mantine 9, light/dark themes, smooth animations, mobile friendly.
@@ -27,7 +31,7 @@ A fast, private chat UI for every AI provider, local or in the cloud. Hebrew (ri
 
 ## 🚀 Getting Started
 
-Visit [YakGPT](https://yakgpt.vercel.app) to try it out without installing, or follow these steps to run it locally:
+Follow these steps to run Hamal on your machine:
 
 ### Prerequisites
 
@@ -37,14 +41,14 @@ Visit [YakGPT](https://yakgpt.vercel.app) to try it out without installing, or f
 
 ### Installation
 
-The install scripts check Node.js (20.9+), install dependencies, build, and create a `yakgpt` launcher. The app listens on `127.0.0.1:3000` only, so it isn't reachable from your network unless you pass `--host 0.0.0.0`.
+The install scripts check Node.js (20.9+), install dependencies, build, and create a `hamal` launcher. The app listens on `127.0.0.1:3000` only, so it isn't reachable from your network unless you pass `--host 0.0.0.0`.
 
 **Linux / macOS**
 
 ```
 $ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
 $ ./scripts/install.sh            # add --ollama to also install Ollama
-$ yakgpt --open
+$ hamal --open
 ```
 
 **Windows** (PowerShell)
@@ -54,7 +58,7 @@ $ yakgpt --open
 > powershell -ExecutionPolicy Bypass -File scripts\install.ps1   # add -Ollama to also install Ollama
 ```
 
-Then double-click `yakgpt.cmd`. If Node.js is missing, the script installs it with `winget`.
+Then double-click `hamal.cmd`. If Node.js is missing, the script installs it with `winget`.
 
 **Android (Termux)**
 
@@ -64,12 +68,12 @@ Install [Termux](https://f-droid.org/packages/com.termux/) from F-Droid (the Pla
 $ pkg install -y git
 $ git clone https://github.com/analist0/yakGPT.git && cd yakGPT
 $ ./scripts/install.sh --ollama --boot
-$ yakgpt --open
+$ hamal --open
 ```
 
 - **Building:** the script installs Node.js with `pkg` and builds with webpack, since Next.js has no native compiler for Android.
-- **Add to Home screen:** in the browser, add YakGPT to the home screen and it opens as a standalone app.
-- **Start at boot:** `--boot` starts YakGPT when the phone boots. It needs the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) app.
+- **Add to Home screen:** in the browser, add Hamal to the home screen and it opens as a standalone app.
+- **Start at boot:** `--boot` starts Hamal when the phone boots. It needs the [Termux:Boot](https://f-droid.org/packages/com.termux.boot/) app.
 - **Keep it running:** run `termux-wake-lock`, otherwise Android may stop the server in the background.
 - **Local models:** on a phone, small models (1–4B parameters) are the realistic choice.
 
@@ -109,17 +113,27 @@ Install [Ollama](https://ollama.com) and start it so the app's origin may call i
 $ OLLAMA_ORIGINS=http://localhost:3000 ollama serve
 ```
 
-YakGPT finds it automatically. Open **Local models** to see your hardware, the models that fit, and to download or remove models.
+Hamal finds it automatically. Open **Local models** to see your hardware, the models that fit, and to download or remove models.
 
 ### Realtime voice (Grok)
 
-With an xAI key set, the headset button in the composer starts a speech-to-speech conversation with Grok. Both sides are transcribed into the chat, and the chat's system prompt and recent messages are given to the voice model. Voice and model are under **Settings → Voice**.
+With an xAI key set, the headset button in the composer starts a speech-to-speech conversation with Grok. Both sides are transcribed into the chat, and the chat's system prompt and recent messages are given to the voice model. When tools are on, Grok can call the same built-in tools, MCP tools and skills as the text chat; the calls appear in the chat as tool cards. Voice and model are under **Settings → Voice**.
+
+### Images
+
+Attach up to 8 images per message with the image button, by pasting (Ctrl+V) or by dropping them on the message box. They are scaled down to 1568 px and sent in the OpenAI image format, which OpenAI, Gemini, xAI, OpenRouter and vision models on Ollama (for example `gemma3`, `qwen2.5vl`) accept. Pick a vision model: others reject the request. Images are stored in the browser's IndexedDB, not in localStorage.
 
 ### Tools, skills and MCP
 
 Open **Tools, skills & MCP**:
 
 - **Tools**: turn tool use on or off, globally or per tool. Models that don't support tools answer normally.
+- **Approval**: choose when the model must ask before running a tool:
+  - **Normal** (default): only tools that read run on their own.
+  - **Medium**: reads and reversible changes run on their own; deleting, sending, paying or publishing asks.
+  - **Free driving**: nothing asks.
+
+  A per-tool "Always ask" / "Never ask" overrides the mode. MCP tools are classified with the server's MCP annotations; tools without them count as destructive.
 - **MCP servers**: add a remote server by URL, or a local server by command (for example `npx -y @modelcontextprotocol/server-filesystem ~/Documents`). Quick-add presets and `mcp.json` import are included.
 - **Skills**: write instruction packs with a name and a "when to use" description; the model loads one with the `load_skill` tool when a task matches. **Import from GitHub** takes a public repository (for example `anthropics/skills`), a folder in it, or a single `SKILL.md` link, lists every skill it finds and imports the ones you pick. Importing again updates skills with the same name.
 
@@ -129,26 +143,18 @@ Local MCP servers, hardware detection and the `fetch_url` tool run on the server
 
 ## 🐳 Docker
 
-To use the pre-built Docker image from Docker Hub (only for amd64), run:
+Build and run the image:
 
 ```
-$ docker run -it -p 3000:3000 yakgpt/yakgpt:latest
-```
-
----
-
-To build the Docker image yourself (such as if you're on arm64), run:
-
-```
-$ docker build -t yakgpt:latest .
-$ docker run -it -p 127.0.0.1:3000:3000 -e YAKGPT_LOCAL_FEATURES=1 yakgpt:latest
+$ docker build -t hamal:latest .
+$ docker run -it -p 127.0.0.1:3000:3000 -e YAKGPT_LOCAL_FEATURES=1 hamal:latest
 ```
 
 `YAKGPT_LOCAL_FEATURES=1` enables local MCP servers and hardware detection inside the container (see above); binding to `127.0.0.1` keeps the port private to your machine. Hardware detection then reports the container's view of the machine.
 
 ## 🎤 Microphone Integration
 
-YakGPT makes chatting a breeze with its microphone integration! Activate your microphone using your browser's permissions, and YakGPT will automatically convert your speech into text.
+Hamal makes chatting a breeze with its microphone integration! Activate your microphone using your browser's permissions, and Hamal will automatically convert your speech into text.
 
 You can also toggle the mic integration as needed by clicking on the microphone icon in the app.
 
@@ -156,11 +162,11 @@ Remember to use a supported web browser and ensure your microphone is functionin
 
 ## 🛡️ Data Privacy and Security
 
-YakGPT uses your own API keys. Chats and keys are stored in your browser, and requests go directly from your browser to the provider you chose. The YakGPT server is only involved for local MCP servers, hardware detection and the `fetch_url` tool.
+Hamal uses your own API keys. Chats and keys are stored in your browser, and requests go directly from your browser to the provider you chose. The Hamal server is only involved for local MCP servers, hardware detection and the `fetch_url` tool.
 
 ## 👩‍💻 For developers
 
-[docs/DEVELOPERS.md](docs/DEVELOPERS.md) (Hebrew) covers the code map, how a message flows through the agent loop, what is tested and what isn't, known gaps (voice ↔ tools, images/video, tool approval, tests/CI) and the plan for each.
+[docs/DEVELOPERS.md](docs/DEVELOPERS.md) (Hebrew) covers the code map, how a message flows through the agent loop, what is tested and what isn't, known gaps (images/video, tool approval, tests/CI) and the plan for each.
 
 ## 📝 Changelog
 

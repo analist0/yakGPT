@@ -35,7 +35,7 @@ const getClient = (config: StdioConfig) => {
         },
         stderr: "pipe",
       });
-      const c = new Client({ name: "yakgpt", version: "1.0.0" });
+      const c = new Client({ name: "hamal", version: "1.0.0" });
       transport.onclose = () => clients.delete(key);
       await c.connect(transport);
       return c;
@@ -72,6 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          annotations: t.annotations,
         })),
       });
     }

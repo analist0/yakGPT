@@ -85,3 +85,35 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.approval {
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--mantine-color-yellow-6);
+  margin-block: 6px;
+
+  & > div {
+    margin-block: 0;
+  }
+}
+
+.approvalBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px 10px;
+}
+
+.approvalArgs {
+  overflow-wrap: anywhere;
+
+  & code {
+    font-family: var(--mantine-font-family-monospace);
+    unicode-bidi: plaintext;
+  }
+}
+
+.subCalls {
+  padding-inline-start: 18px;
+  border-inline-start: 2px solid var(--app-border-strong);
+  margin-inline-start: 10px;
+}

@@ -8,6 +8,8 @@ import { OPENAI_TTS_VOICES } from "./OpenAI";
 import { ProviderId } from "./Providers";
 import type { McpServerConfig } from "./Mcp";
 import type { Skill } from "./Skills";
+import type { ApprovalMode, ToolRule } from "./Approval";
+import type { Memory } from "./Memory";
 
 export type APIState = "idle" | "loading" | "error";
 export type RealtimeState = "idle" | "connecting" | "active";
@@ -33,6 +35,7 @@ export const excludeFromState = [
   "playerAudioQueue",
   "playerIdx",
   "realtimeState",
+  "composerImages",
 ];
 
 interface SettingsForm {
@@ -140,6 +143,8 @@ export interface ChatState {
   playerApiState: APIState;
   playerAudioQueue: AudioChunk[];
   realtimeState: RealtimeState;
+  // Images attached in the composer, not sent yet
+  composerImages: string[];
 
   showTextDuringPTT: boolean;
   autoSendStreamingSTT: boolean;
@@ -155,6 +160,10 @@ export interface ChatState {
   disabledTools: string[];
   mcpServers: McpServerConfig[];
   skills: Skill[];
+  approvalMode: ApprovalMode;
+  toolRules: Record<string, ToolRule>;
+  memoryEnabled: boolean;
+  memories: Memory[];
 }
 export const initialState = {
   apiState: "idle" as APIState,
@@ -196,6 +205,7 @@ export const initialState = {
   playerApiState: "idle",
   playerAudioQueue: [],
   realtimeState: "idle" as RealtimeState,
+  composerImages: [] as string[],
 
   autoSendStreamingSTT: true,
   modelChoicesChat: undefined,
@@ -211,6 +221,10 @@ export const initialState = {
   disabledTools: [] as string[],
   mcpServers: [] as McpServerConfig[],
   skills: [] as Skill[],
+  approvalMode: "normal" as ApprovalMode,
+  toolRules: {} as Record<string, ToolRule>,
+  memoryEnabled: true,
+  memories: [] as Memory[],
 };
 
 const store = () => ({ ...initialState } as ChatState);

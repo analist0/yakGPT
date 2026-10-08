@@ -8,7 +8,10 @@ export interface ToolCall {
   label?: string;
   arguments: string;
   result?: string;
-  status?: "running" | "done" | "error";
+  // pending: waiting for the user's approval
+  status?: "running" | "pending" | "done" | "error" | "denied";
+  // Tool calls made by a sub-agent started with this call
+  subCalls?: ToolCall[];
 }
 
 export interface Message {
@@ -20,6 +23,8 @@ export interface Message {
   reasoning?: string;
   // Function calls made by the assistant in this step, with their results
   toolCalls?: ToolCall[];
+  // Attached images (ids in lib/images.ts)
+  images?: string[];
 }
 
 const messageText = (message: Message) =>
@@ -27,6 +32,12 @@ const messageText = (message: Message) =>
   (message.toolCalls || [])
     .map((c) => c.arguments + (c.result || ""))
     .join("");
+
+// Rough cost of one attached image; providers count roughly 500-1600 tokens
+const IMAGE_TOKENS = 1000;
+
+export const estimateMessageTokens = (message: Message) =>
+  estimateTokens(messageText(message)) + (message.images?.length || 0) * IMAGE_TOKENS;
 
 // Helper function to estimate tokens
 function estimateTokens(content: string): number {
@@ -62,7 +73,7 @@ export function truncateMessages(
   // Try to truncate messages as is
   for (let i = messages.length - 1; i >= startIdx; i--) {
     const message = messages[i];
-    const tokens = estimateTokens(messageText(message));
+    const tokens = estimateMessageTokens(message);
     if (accumulatedTokens + tokens > targetTokens) {
       break;
     }

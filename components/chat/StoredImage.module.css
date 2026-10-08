@@ -1,0 +1,19 @@
+.image {
+  display: block;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--app-surface);
+}
+
+.image[data-clickable] {
+  cursor: zoom-in;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--mantine-color-dimmed);
+  background: rgba(127, 127, 127, 0.12);
+}

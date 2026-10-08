@@ -18,7 +18,8 @@ import { theme } from "@/lib/theme";
 import { useDirection } from "@/lib/i18n";
 import { useChatStore } from "@/stores/ChatStore";
 import { configuredProviders } from "@/stores/Providers";
-import { initMonitoring } from "@/stores/ErrorLog";
+import { captureError, initMonitoring } from "@/stores/ErrorLog";
+import { collectGarbage } from "@/lib/images";
 import { startMcpServers } from "@/stores/Mcp";
 import { checkOllama } from "@/stores/Ollama";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -85,6 +86,9 @@ export default function App({ Component, pageProps }: AppProps) {
       useChatStore.setState({ onboardingDone: true });
     }
     startMcpServers();
+    // Remove stored images of deleted messages and chats
+    const imageIds = state.chats.flatMap((c) => c.messages.flatMap((m) => m.images || []));
+    collectGarbage(new Set(imageIds)).catch((error) => captureError("ui", error));
     // Detect a running Ollama so local models work without setup
     checkOllama();
     return stopMonitoring;
@@ -95,7 +99,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>YakGPT</title>
+        <title>Hamal</title>
         <meta name="description" content="A fast, private chat UI for every AI provider" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" href="/favicon.ico" />

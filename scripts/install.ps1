@@ -1,9 +1,9 @@
-# Installs and builds YakGPT on Windows.
+# Installs and builds Hamal on Windows.
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Ollama
 #
-# Afterwards double-click yakgpt.cmd (or run `node scripts\start.mjs`) and open
+# Afterwards double-click hamal.cmd (or run `node scripts\start.mjs`) and open
 # http://localhost:3000
 param(
   [switch]$Ollama
@@ -47,7 +47,7 @@ npx --yes yarn@1.22.22 build
 if ($LASTEXITCODE -ne 0) { Fail "Build failed" }
 
 # 4. A launcher you can double-click
-$launcher = Join-Path $Root "yakgpt.cmd"
+$launcher = Join-Path $Root "hamal.cmd"
 Set-Content -Path $launcher -Encoding ASCII -Value "@echo off`r`nnode `"%~dp0scripts\start.mjs`" --open %*`r`n"
 Info "Created $launcher"
 
@@ -64,4 +64,4 @@ if ($Ollama) {
 }
 
 Write-Host ""
-Info "Done. Start YakGPT by double-clicking yakgpt.cmd, or run:  node scripts\start.mjs --open"
+Info "Done. Start Hamal by double-clicking hamal.cmd, or run:  node scripts\start.mjs --open"

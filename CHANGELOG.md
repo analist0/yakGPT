@@ -1,5 +1,85 @@
 # Changelog
 
+## 2026-10 — Planning and sub-agents
+
+- **עברית:**
+  - **תוכנית:** במשימות של כמה שלבים המודל כותב תוכנית ומעדכן אותה. התוכנית מוצגת בכרטיס בסוף השיחה, עם התקדמות.
+  - **תתי־סוכנים:** המודל יכול להעביר משימות עצמאיות לתתי־סוכנים. הם עובדים במקביל, כל אחד בהקשר משלו, ומחזירים רק את התוצאה. הכלים שהם מפעילים עוברים את אותם אישורים ומוצגים מתחת לכרטיס של תת־הסוכן.
+- `stores/Agent.ts`: `update_plan` (stored as `chat.plan`, shown in `PlanCard`) and `run_subagent`.
+  - The sub-agent loop runs up to 6 steps with the parent's tools, minus the agent and memory tools.
+  - Its tool calls are recorded as `ToolCall.subCalls` and approved individually.
+- Tools receive a `ToolContext` (call id, chat id, abort signal, the running agent). When all calls in a turn are `run_subagent`, they run in parallel.
+- Planning and sub-agents are not offered in realtime voice.
+
+## 2026-10 — Memory and context compaction
+
+- **עברית:**
+  - **זיכרון ארוך טווח:** המודל שומר עובדות עליך ורואה אותן בכל שיחה. אפשר לראות, לערוך ולמחוק אותן בלשונית "זיכרון", וסיסמאות ומפתחות אף פעם לא נשמרים.
+  - **שיחות ארוכות לא נחתכות:** כשהשיחה מתקרבת לגבול ההקשר, ההודעות הישנות מסוכמות, וקו בצ'אט מסמן מאיפה.
+  - **תוקן באג:** מודלים לא מוכרים (Gemini, ‏Llama, ‏Qwen ועוד) קיבלו הקשר של 4096 טוקנים בלבד, וההיסטוריה נחתכה מוקדם מדי.
+- `stores/Memory.ts`:
+  - `remember`, `update_memory` and `forget` tools, and a memory prompt for every chat and for realtime voice;
+  - credentials are refused;
+  - a **Memory** tab in the tools panel to view, edit and delete memories.
+- `ToolSpec.internal`: tools that only change Hamal's own user-visible data run without approval unless a tool rule says "ask".
+- `stores/Compaction.ts`:
+  - near 70% of the context window, older messages are summarized once and sent as a summary, and recent messages stay verbatim;
+  - the chat shows a divider where the summary applies;
+  - system prompts and approval rules are never summarized;
+  - editing or deleting a summarized message drops the summary.
+- `stores/Model.ts`: context sizes for Gemini, Claude, Llama, Qwen, Gemma, DeepSeek, Mistral and Kimi families; unknown models default to 32K instead of 4096.
+
+## 2026-10 — New name: Hamal (חמ״ל)
+
+- **עברית:** הפרויקט נקרא עכשיו **חמ״ל**: חדר פיקוד לבינה מלאכותית, ובהמשך לצוות סוכנים. השם הוחלף בממשק, באייקון של האפליקציה, במסמכים ובסקריפטי ההתקנה. פקודת ההפעלה היא עכשיו `hamal`, וב־Windows ‏`hamal.cmd`. השיחות, המפתחות וההגדרות נשמרים: מפתחות השמירה בדפדפן לא השתנו.
+- Kept on purpose:
+  - browser storage keys (`chat-store-v23`, `yakgpt-images`, `yakgpt-error-log`), so nothing is lost;
+  - the `YAKGPT_*` environment variables.
+- README no longer points to upstream's hosted site and Docker Hub image, which don't include these changes.
+
+## 2026-10 — Tool approval
+
+- **עברית:** אפשר לבחור מתי המודל צריך לבקש אישור לפני שהוא מפעיל כלי. יש שלושה מצבים:
+  - **רגיל** (ברירת המחדל): רק כלים שקוראים רצים לבד.
+  - **בינוני:** גם שינויים הפיכים רצים לבד. מחיקה, שליחה, תשלום ופרסום דורשים אישור.
+  - **נהיגה חופשית:** הכול רץ בלי לשאול.
+
+  לכל כלי אפשר לקבוע "תמיד לשאול" או "אף פעם לא לשאול". בקשת האישור מופיעה בצ'אט, עם כפתורי אישור, "לאשר תמיד" ודחייה. זה עובד גם בשיחה הקולית.
+- `stores/Approval.ts`: approval modes, per-tool rules, and waiting calls that resolve on approve, decline or abort.
+- `ToolSpec.risk`:
+  - built-in tools are `read`;
+  - MCP tools are classified from MCP annotations (`readOnlyHint`, `destructiveHint`), and unannotated tools count as destructive;
+  - `/api/mcp` and remote MCP now pass annotations through.
+- Tool cards show a pending state with the arguments and buttons. A declined call returns "The user declined this action" to the model.
+- Stopping an answer or a voice session declines pending approvals. Calls that never ran are marked as stopped.
+- The tools menu and the tools panel have the mode switch. The panel also shows each tool's risk and rule.
+
+## 2026-10 — Images and vision
+
+- **עברית:** אפשר לצרף תמונות להודעה, מכפתור, בהדבקה או בגרירה, ולשאול עליהן מודלים שתומכים בתמונות. התמונות מוקטנות, נשמרות בדפדפן ב־IndexedDB ומוצגות בצ'אט. לחיצה על תמונה פותחת אותה בגודל מלא.
+- `lib/images.ts`:
+  - scales images to at most 1568 px and re-encodes them as JPEG;
+  - stores them in IndexedDB (`yakgpt-images`);
+  - deletes unused images older than a day on startup.
+- `Message.images` holds image ids. `toApiMessages` sends user messages with images as OpenAI `text` + `image_url` content parts. `truncateMessages` counts about 1000 tokens per image.
+- Composer:
+  - attach button, paste and drag-and-drop;
+  - thumbnails with remove buttons;
+  - image-only messages;
+  - editing a message brings its images back.
+- Images show in the user bubble and open full size on click.
+- A 4xx error that mentions images suggests switching to a vision model.
+
+## 2026-10 — Tools in realtime voice
+
+- **עברית:** בשיחה הקולית עם Grok אפשר עכשיו להשתמש באותם כלים כמו בצ'אט: הכלים המובנים, שרתי MCP וסקילים. כל קריאה לכלי מוצגת בצ'אט ככרטיס, והמודל עונה בקול עם התוצאה.
+- `stores/XaiRealtime.ts`:
+  - sends the active tools in `session.update` (`tools`) and adds the skills list and a short tool hint to the instructions;
+  - runs `response.function_call_arguments.done` calls through `runTool` and returns `function_call_output` items;
+  - sends a single `response.create` once the response is done and all of its calls have outputs, and none after an interrupted (cancelled) response;
+  - falls back to `function_call` items in `response.done`, deduplicated by `call_id`;
+  - stores calls and results as `toolCalls` on the assistant message, so they render like text-chat tool calls.
+
 ## 2026-10 — Linux, Windows and Termux installers
 
 - **עברית:**

@@ -1,10 +1,18 @@
 // Tool registry for function calling: built-in tools, the load_skill tool and
 // tools exposed by connected MCP servers.
 import { useChatStore } from "./ChatStore";
-import { useMcpStatus, callMcpTool } from "./Mcp";
+import { useMcpStatus, callMcpTool, McpTool } from "./Mcp";
 import { enabledSkills, findSkill } from "./Skills";
+import { MEMORY_TOOLS } from "./Memory";
+import { AGENT_TOOLS } from "./Agent";
+import type { ProviderConnection } from "./Providers";
+import type { ChatCompletionParams } from "./OpenAI";
 
-export type ToolSource = "builtin" | "skill" | "mcp";
+export type ToolSource = "builtin" | "skill" | "mcp" | "memory" | "agent";
+
+// read: only reads or computes. write: changes something that can be undone
+// or stays inside a sandbox. destructive: deletes, sends, pays or publishes
+export type ToolRisk = "read" | "write" | "destructive";
 
 export interface ToolSpec {
   name: string;
@@ -12,8 +20,26 @@ export interface ToolSpec {
   description: string;
   parameters: Record<string, unknown>;
   source: ToolSource;
+  risk: ToolRisk;
+  // Only changes Hamal's own data that the user can see and undo (e.g.
+  // memories): runs without approval in every mode, unless a rule says ask
+  internal?: boolean;
   serverId?: string;
-  run: (args: Record<string, any>) => Promise<string>;
+  run: (args: Record<string, any>, context?: ToolContext) => Promise<string>;
+}
+
+// Where a tool call runs. The agent loop fills in everything; other callers
+// (e.g. realtime voice) only some of it
+export interface ToolContext {
+  callId: string;
+  chatId?: string;
+  signal?: AbortSignal;
+  // The running agent: lets tools such as run_subagent start their own loop
+  agent?: {
+    tools: ToolSpec[];
+    connection: ProviderConnection;
+    params: ChatCompletionParams;
+  };
 }
 
 const CALC_FUNCTIONS = [
@@ -52,6 +78,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       },
     },
     source: "builtin",
+    risk: "read",
     run: async ({ timezone }) => {
       const now = new Date();
       const zone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -72,6 +99,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       required: ["expression"],
     },
     source: "builtin",
+    risk: "read",
     run: async ({ expression }) => evaluateExpression(String(expression)),
   },
   {
@@ -84,6 +112,7 @@ export const BUILTIN_TOOLS: ToolSpec[] = [
       required: ["url"],
     },
     source: "builtin",
+    risk: "read",
     run: async ({ url }) => {
       const res = await fetch("/api/fetch-url", {
         method: "POST",
@@ -107,6 +136,7 @@ const LOAD_SKILL_TOOL: ToolSpec = {
     required: ["name"],
   },
   source: "skill",
+  risk: "read",
   run: async ({ name }) => {
     const skill = findSkill(String(name));
     if (!skill) throw new Error(`No enabled skill named "${name}"`);
@@ -117,6 +147,15 @@ const LOAD_SKILL_TOOL: ToolSpec = {
 // OpenAI-compatible tool names: [a-zA-Z0-9_-]{1,64}
 const slug = (text: string) =>
   text.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+
+// MCP's defaults: a tool that is not read-only counts as destructive unless it
+// says otherwise
+const mcpRisk = (tool: McpTool): ToolRisk =>
+  tool.annotations?.readOnlyHint
+    ? "read"
+    : tool.annotations?.destructiveHint === false
+    ? "write"
+    : "destructive";
 
 export const allTools = (): ToolSpec[] => {
   const { mcpServers } = useChatStore.getState();
@@ -131,6 +170,7 @@ export const allTools = (): ToolSpec[] => {
         description: tool.description || tool.name,
         parameters: tool.inputSchema || { type: "object", properties: {} },
         source: "mcp" as const,
+        risk: mcpRisk(tool),
         serverId: server.id,
         run: (args) => callMcpTool(server.id, tool.name, args),
       }))
@@ -139,6 +179,8 @@ export const allTools = (): ToolSpec[] => {
   return [
     ...BUILTIN_TOOLS,
     ...(enabledSkills().length > 0 ? [LOAD_SKILL_TOOL] : []),
+    ...(useChatStore.getState().memoryEnabled ? MEMORY_TOOLS : []),
+    ...AGENT_TOOLS,
     ...mcpTools,
   ];
 };
@@ -162,7 +204,12 @@ export const toggleTool = (name: string) =>
       : [...state.disabledTools, name],
   }));
 
-export const runTool = async (tools: ToolSpec[], name: string, rawArgs: string) => {
+export const runTool = async (
+  tools: ToolSpec[],
+  name: string,
+  rawArgs: string,
+  context?: ToolContext
+) => {
   const tool = tools.find((t) => t.name === name);
   if (!tool) throw new Error(`Unknown tool ${name}`);
   let args: Record<string, any> = {};
@@ -173,5 +220,5 @@ export const runTool = async (tools: ToolSpec[], name: string, rawArgs: string) 
       throw new Error(`Invalid JSON arguments: ${rawArgs.slice(0, 200)}`);
     }
   }
-  return tool.run(args);
+  return tool.run(args, context);
 };

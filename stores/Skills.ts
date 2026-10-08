@@ -187,7 +187,7 @@ export const exportSkills = () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "yakgpt-skills.json";
+  a.download = "hamal-skills.json";
   a.click();
   URL.revokeObjectURL(url);
 };

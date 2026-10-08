@@ -44,15 +44,32 @@ export const modelInfos: Record<
 };
 
 // Context sizes for model families not listed above. Costs are unknown (0).
+// Conservative where families differ by size or version.
 const contextByPrefix: [RegExp, number][] = [
   [/^grok-/, 128 * 1024],
-  [/^(gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o\d)/, 128 * 1024],
+  [/^(gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o\d|chatgpt-)/, 128 * 1024],
+  [/^gpt-oss/, 128 * 1024],
+  [/^gemini-/, 1000 * 1000],
+  [/^gemma-?3/, 128 * 1024],
+  [/^gemma/, 8 * 1024],
+  [/^claude-/, 200 * 1000],
+  [/^(meta-)?llama-?3\.[1-3]|^llama-?4/, 128 * 1024],
+  [/^(qwen3|qwen-?2\.5|qwq)/, 32 * 1024],
+  [/^(deepseek)/, 64 * 1024],
+  [/^(mistral|mixtral|codestral|ministral)/, 32 * 1024],
+  [/^(kimi|moonshot)/, 128 * 1024],
 ];
 
-export const getModelInfo = (model: string) =>
-  modelInfos[model] || {
+// Context size assumed for unknown models
+const DEFAULT_CONTEXT = 32 * 1024;
+
+export const getModelInfo = (model: string) => {
+  if (modelInfos[model]) return modelInfos[model];
+  // OpenRouter ids are vendor/model; Ollama ids are model:tag
+  const id = model.toLowerCase().replace(/^.*\//, "").replace(/^models\//, "");
+  return {
     displayName: model,
-    maxTokens:
-      contextByPrefix.find(([prefix]) => prefix.test(model))?.[1] || 4096,
+    maxTokens: contextByPrefix.find(([prefix]) => prefix.test(id))?.[1] || DEFAULT_CONTEXT,
     costPer1kTokens: { prompt: 0, completion: 0 },
   };
+};

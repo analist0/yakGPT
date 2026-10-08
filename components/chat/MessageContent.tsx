@@ -1,16 +1,20 @@
 import { memo, useState } from "react";
 import Markdown from "markdown-to-jsx";
-import { Collapse, Group, Loader, Text, UnstyledButton } from "@mantine/core";
+import { Button, Collapse, Group, Loader, Text, UnstyledButton } from "@mantine/core";
 import {
+  IconBan,
   IconBrain,
   IconCheck,
   IconChevronDown,
+  IconHandStop,
   IconTool,
   IconX,
 } from "@tabler/icons-react";
+import { resolveApproval, setToolRule } from "@/stores/Approval";
 import { Message, ToolCall } from "@/stores/Message";
 import { useT } from "@/lib/i18n";
 import CodeBlock from "./CodeBlock";
+import MessageImages from "./MessageImages";
 import classes from "./MessageContent.module.css";
 
 const PassThrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
@@ -84,6 +88,10 @@ function ToolCallView({ call }: { call: ToolCall }) {
   const icon =
     call.status === "running" ? (
       <Loader size={14} type="oval" />
+    ) : call.status === "pending" ? (
+      <IconHandStop size={15} color="var(--mantine-color-yellow-5)" />
+    ) : call.status === "denied" ? (
+      <IconBan size={15} color="var(--mantine-color-gray-5)" />
     ) : call.status === "error" ? (
       <IconX size={15} color="var(--mantine-color-red-5)" />
     ) : (
@@ -93,14 +101,16 @@ function ToolCallView({ call }: { call: ToolCall }) {
   try {
     args = JSON.stringify(JSON.parse(call.arguments || "{}"), null, 2);
   } catch {}
+  const pending = call.status === "pending";
   return (
+    <div className={pending ? classes.approval : undefined}>
     <Expandable
       icon={
         <span className={classes.toolIcon}>
           <IconTool size={14} />
         </span>
       }
-      active={call.status === "running"}
+      active={call.status === "running" || pending}
       title={
         <Group gap={6} wrap="nowrap" component="span">
           {icon}
@@ -123,6 +133,40 @@ function ToolCallView({ call }: { call: ToolCall }) {
         </>
       )}
     </Expandable>
+    {pending && (
+      <div className={classes.approvalBar}>
+        <Text size="xs" c="dimmed" className={classes.approvalArgs}>
+          {t("Wants to run with:", "מבקש להריץ עם:")} <code>{call.arguments || "{}"}</code>
+        </Text>
+        <Group gap={6}>
+          <Button size="compact-sm" color="teal" onClick={() => resolveApproval(call.id, true)}>
+            {t("Approve", "אישור")}
+          </Button>
+          <Button
+            size="compact-sm"
+            variant="light"
+            color="teal"
+            onClick={() => {
+              setToolRule(call.name, "auto");
+              resolveApproval(call.id, true);
+            }}
+          >
+            {t("Always allow this tool", "לאשר תמיד את הכלי הזה")}
+          </Button>
+          <Button size="compact-sm" variant="subtle" color="red" onClick={() => resolveApproval(call.id, false)}>
+            {t("Decline", "דחייה")}
+          </Button>
+        </Group>
+      </div>
+    )}
+    {call.subCalls?.length ? (
+      <div className={classes.subCalls}>
+        {call.subCalls.map((sub) => (
+          <ToolCallView key={sub.id} call={sub} />
+        ))}
+      </div>
+    ) : null}
+    </div>
   );
 }
 
@@ -145,6 +189,7 @@ export default function MessageContent({ message }: { message: Message }) {
 
   return (
     <>
+      {message.images?.length ? <MessageImages ids={message.images} /> : null}
       {reasoning && (
         <Expandable
           icon={isThinking ? <Loader size={14} type="dots" /> : <IconBrain size={15} />}

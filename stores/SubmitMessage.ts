@@ -9,6 +9,10 @@ import { getProviderConnection, isProviderConfigured } from "./Providers";
 import { activeTools, runTool, toOpenAITools, ToolSpec } from "./Tools";
 import { skillsPrompt } from "./Skills";
 import { captureError } from "./ErrorLog";
+import { DECLINED_RESULT, needsApproval, requestApproval } from "./Approval";
+import { memoryPrompt } from "./Memory";
+import { compactIfNeeded, contextMessages, invalidateSummary, summaryPrompt } from "./Compaction";
+import { Chat } from "./Chat";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -52,9 +56,21 @@ const pushAssistantMessage = (chatId: string) => {
   return id;
 };
 
-// Skill list is appended to the chat's own system prompt, or sent as one
-const withSkills = (messages: Message[], tools: ToolSpec[]) => {
-  const prompt = tools.some((t) => t.name === "load_skill") && skillsPrompt();
+const AGENT_HINT =
+  "For a task with several steps, first write a plan with update_plan and keep it updated as you go. " +
+  "Hand independent, self-contained subtasks to run_subagent; several calls in one turn run in parallel.";
+
+// Skills, memories and the summary of earlier messages go into the system
+// prompt: appended to the chat's own system message, or sent as one
+const withContext = (messages: Message[], tools: ToolSpec[], chat: Chat) => {
+  const prompt = [
+    tools.some((t) => t.name === "run_subagent") && AGENT_HINT,
+    tools.some((t) => t.name === "load_skill") && skillsPrompt(),
+    memoryPrompt(),
+    summaryPrompt(chat),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   if (!prompt) return messages;
   if (messages[0]?.role === "system") {
     return [
@@ -62,7 +78,7 @@ const withSkills = (messages: Message[], tools: ToolSpec[]) => {
       ...messages.slice(1),
     ];
   }
-  return [{ id: "skills", role: "system" as const, content: prompt }, ...messages];
+  return [{ id: "context", role: "system" as const, content: prompt }, ...messages];
 };
 
 const isToolsUnsupported = (error: CompletionError) =>
@@ -70,9 +86,17 @@ const isToolsUnsupported = (error: CompletionError) =>
   error.status < 500 &&
   /tool|function/i.test(error.message);
 
+// A 4xx that looks like the model rejecting image input
+const isImagesUnsupported = (error: unknown, chatId: string) =>
+  error instanceof CompletionError &&
+  error.status >= 400 &&
+  error.status < 500 &&
+  /image|vision|multimodal|image_url|content.*(array|type)/i.test(error.message) &&
+  !!getChatById(get().chats, chatId)?.messages.some((m) => m.images?.length);
+
 export const submitMessage = async (message: Message) => {
   // If message is empty, do nothing
-  if (message.content.trim() === "") {
+  if (message.content.trim() === "" && !message.images?.length) {
     console.error("Message is empty");
     return;
   }
@@ -86,6 +110,7 @@ export const submitMessage = async (message: Message) => {
 
   // If this is an existing message, remove all the messages after it
   const index = chat.messages.findIndex((m) => m.id === message.id);
+  if (index !== -1) invalidateSummary(chat.id, message.id);
   set((state) => ({
     apiState: "loading",
     chats: updateChatMessages(state.chats, chat.id, (messages) => [
@@ -135,10 +160,26 @@ export const submitMessage = async (message: Message) => {
 
     // Offer tools until the last step, then force a text answer
     const offeredTools = step < MAX_TOOL_STEPS ? tools : [];
-    const history = withSkills(
-      getChatById(get().chats, chat.id)!.messages.filter((m) => m.id !== assistantMsgId),
-      offeredTools
-    );
+    // Summarize older messages when the history nears the context limit
+    try {
+      await compactIfNeeded({
+        chatId: chat.id,
+        exclude: assistantMsgId,
+        params: settings,
+        connection,
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.loading = false;
+        });
+        break;
+      }
+      captureError("chat", error, { details: "context compaction" });
+    }
+    const current = getChatById(get().chats, chat.id)!;
+    const history = withContext(contextMessages(current, assistantMsgId), offeredTools, current);
 
     let result;
     try {
@@ -185,7 +226,12 @@ export const submitMessage = async (message: Message) => {
       captureError("chat", error, {
         details: `${connection.baseUrl} · ${settings.model}`,
       });
-      notifications.show({ message: (error as Error).message, color: "red" });
+      notifications.show({
+        message: isImagesUnsupported(error, chat.id)
+          ? `${(error as Error).message}\n\n${settings.model} may not accept images. Pick a vision model (for example GPT-4o, Gemini, Grok with vision, or gemma3 / qwen2.5vl on Ollama).`
+          : (error as Error).message,
+        color: "red",
+      });
       updateMessageById(chat.id, assistantMsgId, (m) => {
         m.loading = false;
       });
@@ -208,11 +254,37 @@ export const submitMessage = async (message: Message) => {
     if (result.aborted || result.toolCalls.length === 0) break;
 
     // Run the requested tools and store their results on the message
-    for (const call of result.toolCalls) {
-      if (abortController.signal.aborted) break;
+    const runCall = async (call: (typeof result.toolCalls)[number]) => {
+      if (abortController.signal.aborted) return;
       let update: Partial<ToolCall>;
+      const tool = tools.find((t) => t.name === call.name);
+      if (tool && needsApproval(tool)) {
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, status: "pending" } : c));
+        });
+        const approved = await requestApproval(call.id, abortController.signal);
+        if (!approved) {
+          updateMessageById(chat.id, assistantMsgId, (m) => {
+            m.toolCalls = m.toolCalls?.map((c) =>
+              c.id === call.id ? { ...c, status: "denied", result: DECLINED_RESULT } : c
+            );
+          });
+          return;
+        }
+        updateMessageById(chat.id, assistantMsgId, (m) => {
+          m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, status: "running" } : c));
+        });
+      }
       try {
-        update = { result: await runTool(tools, call.name, call.arguments), status: "done" };
+        update = {
+          result: await runTool(tools, call.name, call.arguments, {
+            callId: call.id,
+            chatId: chat.id,
+            signal: abortController.signal,
+            agent: { tools, connection, params: settings },
+          }),
+          status: "done",
+        };
       } catch (error) {
         captureError("tools", error, { details: call.name });
         update = { result: `Error: ${(error as Error).message}`, status: "error" };
@@ -220,8 +292,24 @@ export const submitMessage = async (message: Message) => {
       updateMessageById(chat.id, assistantMsgId, (m) => {
         m.toolCalls = m.toolCalls?.map((c) => (c.id === call.id ? { ...c, ...update } : c));
       });
+    };
+    // Sub-agents called together run in parallel; other tools run in order
+    if (result.toolCalls.every((c) => c.name === "run_subagent")) {
+      await Promise.all(result.toolCalls.map(runCall));
+    } else {
+      for (const call of result.toolCalls) await runCall(call);
     }
-    if (abortController.signal.aborted) break;
+    if (abortController.signal.aborted) {
+      // Calls that never ran
+      updateMessageById(chat.id, assistantMsgId, (m) => {
+        m.toolCalls = m.toolCalls?.map((c) =>
+          c.status === "running" || c.status === "pending"
+            ? { ...c, status: "error", result: c.result ?? "Stopped" }
+            : c
+        );
+      });
+      break;
+    }
   }
 
   set({ apiState: "idle", currentAbortController: undefined });

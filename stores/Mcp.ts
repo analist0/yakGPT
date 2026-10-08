@@ -24,6 +24,8 @@ export interface McpTool {
   name: string;
   description?: string;
   inputSchema: Record<string, unknown>;
+  // MCP tool hints, used to decide which calls need approval
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; title?: string };
 }
 
 export type McpConnectionState =
@@ -68,12 +70,12 @@ const connectHttp = async (config: McpServerConfig) => {
   const url = new URL(config.url!);
   const requestInit = { headers: config.headers || {} };
 
-  const client = new Client({ name: "yakgpt", version: "1.0.0" });
+  const client = new Client({ name: "hamal", version: "1.0.0" });
   try {
     await client.connect(new StreamableHTTPClientTransport(url, { requestInit }));
   } catch (streamableError) {
     // Older servers only speak the SSE transport
-    const sseClient = new Client({ name: "yakgpt", version: "1.0.0" });
+    const sseClient = new Client({ name: "hamal", version: "1.0.0" });
     try {
       await sseClient.connect(new SSEClientTransport(url, { requestInit }));
     } catch {
@@ -98,6 +100,7 @@ export const connectMcpServer = async (config: McpServerConfig) => {
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema as Record<string, unknown>,
+        annotations: t.annotations,
       }));
     } else {
       const data = await postServer({ action: "listTools", config });
