@@ -21,6 +21,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import {
   IconBook,
+  IconBrandGithub,
   IconDownload,
   IconPencil,
   IconPlug,
@@ -52,6 +53,7 @@ import {
   toggleSkill,
 } from "@/stores/Skills";
 import { captureError } from "@/stores/ErrorLog";
+import GithubSkillsImport from "./GithubSkillsImport";
 import { useT } from "@/lib/i18n";
 import classes from "./ToolsPanel.module.css";
 
@@ -447,6 +449,7 @@ function SkillsTab() {
   const t = useT();
   const skills = useChatStore((state) => state.skills);
   const [editing, setEditing] = useState<Skill | "new" | null>(null);
+  const [githubOpen, setGithubOpen] = useState(false);
 
   const importFile = async (file: File | null) => {
     if (!file) return;
@@ -476,6 +479,11 @@ function SkillsTab() {
             <Text size="xs" c="dimmed" lineClamp={2}>
               {skill.description}
             </Text>
+            {skill.source && (
+              <Text size="xs" c="dimmed" truncate dir="ltr" ta="start">
+                {skill.source.replace("https://github.com/", "")}
+              </Text>
+            )}
           </div>
           <Group gap={4} wrap="nowrap">
             <ActionIcon size="sm" color="gray" onClick={() => setEditing(skill)}>
@@ -502,10 +510,16 @@ function SkillsTab() {
           />
         )}
       </Collapse>
-      {!editing && (
+      <Collapse expanded={githubOpen}>
+        {githubOpen && <GithubSkillsImport onDone={() => setGithubOpen(false)} />}
+      </Collapse>
+      {!editing && !githubOpen && (
         <Group gap="xs">
           <Button leftSection={<IconPlus size={15} />} onClick={() => setEditing("new")}>
             {t("New skill", "סקיל חדש")}
+          </Button>
+          <Button variant="light" leftSection={<IconBrandGithub size={15} />} onClick={() => setGithubOpen(true)}>
+            {t("Import from GitHub", "ייבוא מ־GitHub")}
           </Button>
           <FileButton onChange={importFile} accept=".md,.json,.txt">
             {(props) => (

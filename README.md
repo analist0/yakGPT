@@ -95,7 +95,7 @@ Open **Tools, skills & MCP**:
 
 - **Tools**: turn tool use on or off, globally or per tool. Models that don't support tools answer normally.
 - **MCP servers**: add a remote server by URL, or a local server by command (for example `npx -y @modelcontextprotocol/server-filesystem ~/Documents`). Quick-add presets and `mcp.json` import are included.
-- **Skills**: write instruction packs with a name and a "when to use" description; the model loads one with the `load_skill` tool when a task matches.
+- **Skills**: write instruction packs with a name and a "when to use" description; the model loads one with the `load_skill` tool when a task matches. **Import from GitHub** takes a public repository (for example `anthropics/skills`), a folder in it, or a single `SKILL.md` link, lists every skill it finds and imports the ones you pick. Importing again updates skills with the same name.
 
 ### Local-only server features
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10 — Import skills from GitHub
+
+- **עברית:** ייבוא סקילים ממאגר GitHub ציבורי (למשל `anthropics/skills`), מתיקייה בתוכו או מקישור לקובץ SKILL.md. כל הסקילים שנמצאים מוצגים לבחירה, וייבוא חוזר מעדכן סקילים קיימים במקום לשכפל אותם.
+- Skills tab → **Import from GitHub** (`lib/githubSkills.ts`, `components/modals/GithubSkillsImport.tsx`):
+  - accepts `owner/repo`, repository/folder URLs and single `SKILL.md` links;
+  - finds every `SKILL.md` with one GitHub API call (the repository tree) and reads files from raw.githubusercontent.com;
+  - shows a selectable list with progress, read failures and rate-limit errors.
+- Re-importing updates skills with the same name instead of duplicating them (`upsertSkills`).
+- Imported skills keep their source folder, and their instructions say where the skill's other files are.
+- The SKILL.md parser now handles CRLF line endings and multi-line (`>` / `|`) and quoted front-matter values.
+
 ## 2026-10 — Redesign, providers, local models, tools, MCP and monitoring
 
 ### סיכום בעברית

@@ -10,6 +10,8 @@ export interface Skill {
   description: string;
   instructions: string;
   enabled: boolean;
+  // Where an imported skill came from (e.g. its GitHub folder)
+  source?: string;
 }
 
 const get = useChatStore.getState;
@@ -106,17 +108,38 @@ export const skillsPrompt = () => {
   ].join("\n");
 };
 
-// SKILL.md: YAML-like front matter with name and description, then the body
-export const parseSkillMarkdown = (text: string): Omit<Skill, "id"> => {
-  const match = text.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
-  if (!match) throw new Error("Missing front matter (--- name / description ---)");
+// Reads the front matter fields we need: plain, quoted, and folded (">") or
+// literal ("|") block values, which longer descriptions often use
+const parseFrontMatter = (yaml: string) => {
   const meta: Record<string, string> = {};
-  match[1].split("\n").forEach((line) => {
-    const [key, ...rest] = line.split(":");
-    if (key && rest.length) {
-      meta[key.trim()] = rest.join(":").trim().replace(/^["']|["']$/g, "");
+  const lines = yaml.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!match) continue;
+    const [, key, raw] = match;
+    let value = raw.trim();
+    // Indented lines after the key continue its value
+    const continuation: string[] = [];
+    while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) {
+      continuation.push(lines[++i].trim());
     }
-  });
+    if (/^[>|][+-]?$/.test(value)) {
+      value = continuation.join(value.startsWith("|") ? "\n" : " ");
+    } else if (continuation.length) {
+      value = [value, ...continuation].join(" ");
+    }
+    meta[key] = value.replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
+  }
+  return meta;
+};
+
+// SKILL.md: front matter with name and description, then the instructions
+export const parseSkillMarkdown = (text: string): Omit<Skill, "id"> => {
+  const match = text
+    .replace(/\r\n/g, "\n")
+    .match(/^\uFEFF?---\s*\n([\s\S]*?)\n---\s*(?:\n|$)([\s\S]*)$/);
+  if (!match) throw new Error("Missing front matter (--- name / description ---)");
+  const meta = parseFrontMatter(match[1]);
   if (!meta.name || !meta.description) {
     throw new Error("Front matter needs name and description");
   }
@@ -126,6 +149,12 @@ export const parseSkillMarkdown = (text: string): Omit<Skill, "id"> => {
     instructions: match[2].trim(),
     enabled: true,
   };
+};
+
+// Adds or replaces skills by name, so importing again updates them
+export const upsertSkills = (skills: Omit<Skill, "id">[]) => {
+  const byName = new Map(get().skills.map((s) => [s.name, s.id]));
+  skills.forEach((skill) => saveSkill({ ...skill, id: byName.get(validName(skill.name)) }));
 };
 
 export const skillToMarkdown = (skill: Skill) =>
