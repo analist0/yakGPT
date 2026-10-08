@@ -18,12 +18,18 @@ import { testKey as testKeyAzure } from "@/stores/AzureSDK";
 import { useChatStore } from "@/stores/ChatStore";
 import {
   IconBrandWindows,
+  IconBrandX,
   IconCheck,
+  IconServer,
   IconRobot,
   IconVolume,
   IconX,
 } from "@tabler/icons-react";
-import { update } from "@/stores/ChatActions";
+import { activateProviderIfNeeded, update } from "@/stores/ChatActions";
+import {
+  DEFAULT_OLLAMA_BASE_URL,
+  normalizeOllamaBaseUrl,
+} from "@/stores/Providers";
 
 export function APIPanel({
   name,
@@ -35,6 +41,9 @@ export function APIPanel({
   descriptionBelowInput,
   validateKey,
   closeModal,
+  inputLabel = "API Key",
+  placeholder = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  secret = true,
 }: {
   name: string;
   initialKey: string | undefined;
@@ -45,6 +54,9 @@ export function APIPanel({
   descriptionBelowInput: React.ReactNode;
   validateKey: (key: string, region?: string) => Promise<boolean>;
   closeModal: () => void;
+  inputLabel?: string;
+  placeholder?: string;
+  secret?: boolean;
 }) {
   const [checkStatus, setCheckStatus] = useState<
     "idle" | "loading" | "success" | "error"
@@ -91,19 +103,28 @@ export function APIPanel({
     error: <IconX color="red" size={px("1rem")} />,
   };
   const icon = iconMap[checkStatus];
-  console.log(apiKey);
   return (
     <div>
       <form onSubmit={handleSubmit}>
         <h2>🔑 {name}:</h2>
         <p>{descriptionAboveInput}</p>
-        <PasswordInput
-          label="API Key"
-          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-          icon={icon}
-          value={apiKey}
-          onChange={handleKeyChange}
-        />
+        {secret ? (
+          <PasswordInput
+            label={inputLabel}
+            placeholder={placeholder}
+            icon={icon}
+            value={apiKey}
+            onChange={handleKeyChange}
+          />
+        ) : (
+          <TextInput
+            label={inputLabel}
+            placeholder={placeholder}
+            icon={icon}
+            value={apiKey}
+            onChange={handleKeyChange}
+          />
+        )}
         {setKeyFunRegion && (
           <TextInput
             label="Region"
@@ -135,7 +156,21 @@ export default function KeyModal({ close }: { close: () => void }) {
   const apiKeyAzure = useChatStore((state) => state.apiKeyAzure);
   const apiKeyAzureRegion = useChatStore((state) => state.apiKeyAzureRegion);
 
-  const setApiKeyOpenAI = (key: string) => update({ apiKey: key });
+  const apiKeyXai = useChatStore((state) => state.apiKeyXai);
+  const ollamaBaseUrl = useChatStore((state) => state.ollamaBaseUrl);
+
+  const setApiKeyOpenAI = (key: string) => {
+    update({ apiKey: key });
+    activateProviderIfNeeded("openai");
+  };
+  const setApiKeyXai = (key: string) => {
+    update({ apiKeyXai: key });
+    activateProviderIfNeeded("xai");
+  };
+  const setOllamaBaseUrl = (url: string) => {
+    update({ ollamaBaseUrl: normalizeOllamaBaseUrl(url) });
+    activateProviderIfNeeded("ollama");
+  };
   const setApiKeyAzure = (key: string) => update({ apiKeyAzure: key });
   const setApiKeyAzureRegion = (region: string) =>
     update({ apiKeyAzureRegion: region });
@@ -148,6 +183,12 @@ export default function KeyModal({ close }: { close: () => void }) {
           <Tabs.List>
             <Tabs.Tab value="openai" icon={<IconRobot size={px("0.8rem")} />}>
               OpenAI
+            </Tabs.Tab>
+            <Tabs.Tab value="xai" icon={<IconBrandX size={px("0.8rem")} />}>
+              xAI
+            </Tabs.Tab>
+            <Tabs.Tab value="ollama" icon={<IconServer size={px("0.8rem")} />}>
+              Ollama
             </Tabs.Tab>
             <Tabs.Tab
               value="azure"
@@ -179,6 +220,54 @@ export default function KeyModal({ close }: { close: () => void }) {
                 </p>
               }
               validateKey={testKeyOpenAI}
+              closeModal={close}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel value="xai" pt="xs">
+            <APIPanel
+              name="Enter Your xAI API Key"
+              initialKey={apiKeyXai}
+              setKeyFun={setApiKeyXai}
+              descriptionAboveInput="Use Grok models for chat. Your API Key is stored locally on your browser and never sent anywhere else. Speech to text and OpenAI text to speech still use your OpenAI key."
+              descriptionBelowInput={
+                <p>
+                  → Get your API key from the{" "}
+                  <a target="_blank" href="https://console.x.ai">
+                    xAI console
+                  </a>
+                  .
+                </p>
+              }
+              validateKey={(key) => testKeyOpenAI(key, "https://api.x.ai/v1")}
+              closeModal={close}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel value="ollama" pt="xs">
+            <APIPanel
+              name="Connect to Ollama"
+              initialKey={ollamaBaseUrl ?? DEFAULT_OLLAMA_BASE_URL}
+              setKeyFun={setOllamaBaseUrl}
+              inputLabel="Server URL"
+              placeholder={DEFAULT_OLLAMA_BASE_URL}
+              secret={false}
+              descriptionAboveInput="Use local models served by Ollama. No API key is needed."
+              descriptionBelowInput={
+                <p>
+                  → Ollama must allow requests from this site. Start it with{" "}
+                  <code>OLLAMA_ORIGINS={"<this site's URL>"} ollama serve</code>
+                  , see the{" "}
+                  <a
+                    target="_blank"
+                    href="https://github.com/ollama/ollama/blob/main/docs/faq.md"
+                  >
+                    Ollama FAQ
+                  </a>
+                  .
+                </p>
+              }
+              validateKey={(url) =>
+                testKeyOpenAI(undefined, normalizeOllamaBaseUrl(url))
+              }
               closeModal={close}
             />
           </Tabs.Panel>

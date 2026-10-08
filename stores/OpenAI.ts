@@ -1,9 +1,10 @@
 import _ from "lodash";
-import { IncomingMessage } from "http";
-import https from "https";
 import { Message, truncateMessages, countTokens } from "./Message";
 import { getModelInfo } from "./Model";
 import axios from "axios";
+import { ProviderConnection } from "./Providers";
+
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 export function assertIsError(e: any): asserts e is Error {
   if (!(e instanceof Error)) {
@@ -11,12 +12,10 @@ export function assertIsError(e: any): asserts e is Error {
   }
 }
 
-async function fetchFromAPI(endpoint: string, key: string) {
+async function fetchFromAPI(endpoint: string, key: string | undefined) {
   try {
     const res = await axios.get(endpoint, {
-      headers: {
-        Authorization: `Bearer ${key}`,
-      },
+      headers: key ? { Authorization: `Bearer ${key}` } : {},
     });
     return res;
   } catch (e) {
@@ -27,66 +26,30 @@ async function fetchFromAPI(endpoint: string, key: string) {
   }
 }
 
-export async function testKey(key: string): Promise<boolean> {
+export async function testKey(
+  key: string | undefined,
+  baseUrl: string = OPENAI_BASE_URL
+): Promise<boolean> {
   try {
-    const res = await fetchFromAPI("https://api.openai.com/v1/models", key);
+    const res = await fetchFromAPI(`${baseUrl}/models`, key);
     return res.status === 200;
   } catch (e) {
-    if (axios.isAxiosError(e)) {
-      if (e.response!.status === 401) {
-        return false;
-      }
-    }
+    return false;
   }
-  return false;
 }
 
-export async function fetchModels(key: string): Promise<string[]> {
+export async function fetchModels(
+  connection: ProviderConnection
+): Promise<string[]> {
   try {
-    const res = await fetchFromAPI("https://api.openai.com/v1/models", key);
+    const res = await fetchFromAPI(
+      `${connection.baseUrl}/models`,
+      connection.apiKey
+    );
     return res.data.data.map((model: any) => model.id);
   } catch (e) {
     return [];
   }
-}
-
-export async function _streamCompletion(
-  payload: string,
-  apiKey: string,
-  abortController?: AbortController,
-  callback?: ((res: IncomingMessage) => void) | undefined,
-  errorCallback?: ((res: IncomingMessage, body: string) => void) | undefined
-) {
-  const req = https.request(
-    {
-      hostname: "api.openai.com",
-      port: 443,
-      path: "/v1/chat/completions",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      signal: abortController?.signal,
-    },
-    (res) => {
-      if (res.statusCode !== 200) {
-        let errorBody = "";
-        res.on("data", (chunk) => {
-          errorBody += chunk;
-        });
-        res.on("end", () => {
-          errorCallback?.(res, errorBody);
-        });
-        return;
-      }
-      callback?.(res);
-    }
-  );
-
-  req.write(payload);
-
-  req.end();
 }
 
 interface ChatCompletionParams {
@@ -116,13 +79,13 @@ const paramKeys = [
 export async function streamCompletion(
   messages: Message[],
   params: ChatCompletionParams,
-  apiKey: string,
+  connection: ProviderConnection,
   abortController?: AbortController,
-  callback?: ((res: IncomingMessage) => void) | undefined,
+  callback?: ((content: string) => void) | undefined,
   endCallback?:
     | ((promptTokensUsed: number, completionTokensUsed: number) => void)
     | undefined,
-  errorCallback?: ((res: IncomingMessage, body: string) => void) | undefined
+  errorCallback?: ((status: number, body: string) => void) | undefined
 ) {
   const modelInfo = getModelInfo(params.model);
 
@@ -137,79 +100,105 @@ export async function streamCompletion(
     Object.entries(params).filter(([key]) => paramKeys.includes(key))
   );
 
+  const logitBias = JSON.parse(params.logit_bias || "{}");
   const payload = JSON.stringify({
     messages: submitMessages.map(({ role, content }) => ({ role, content })),
     stream: true,
-    ...{
-      ...submitParams,
-      logit_bias: JSON.parse(params.logit_bias || "{}"),
-      // 0 == unlimited
-      max_tokens: params.max_tokens || undefined,
-    },
+    ...submitParams,
+    // Leave out unset parameters, some providers reject them
+    stop: params.stop || undefined,
+    logit_bias: _.isEmpty(logitBias) ? undefined : logitBias,
+    presence_penalty: params.presence_penalty || undefined,
+    frequency_penalty: params.frequency_penalty || undefined,
+    n: params.n === 1 ? undefined : params.n,
+    // 0 == unlimited
+    max_tokens: params.max_tokens || undefined,
   });
 
+  let res: Response;
+  try {
+    res = await fetch(`${connection.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(connection.apiKey
+          ? { Authorization: `Bearer ${connection.apiKey}` }
+          : {}),
+      },
+      body: payload,
+      signal: abortController?.signal,
+    });
+  } catch (e) {
+    if (abortController?.signal.aborted) {
+      endCallback?.(0, 0);
+      return;
+    }
+    errorCallback?.(0, `Could not reach ${connection.baseUrl}`);
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    errorCallback?.(res.status, await res.text());
+    return;
+  }
+
   let buffer = "";
+  // Server-sent events can be split across chunks, keep the incomplete line
+  let pending = "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
 
-  const successCallback = (res: IncomingMessage) => {
-    res.on("data", (chunk) => {
-      if (abortController?.signal.aborted) {
-        res.destroy();
-        endCallback?.(0, 0);
-        return;
-      }
+  const handleLine = (line: string) => {
+    if (!line.startsWith("data:")) return;
+    const cleaned = line.slice(5).trim();
+    if (!cleaned || cleaned === "[DONE]") return;
 
-      // Split response into individual messages
-      const allMessages = chunk.toString().split("\n\n");
-      for (const message of allMessages) {
-        // Remove first 5 characters ("data:") of response
-        const cleaned = message.toString().trim().slice(5);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      console.error(e);
+      return;
+    }
 
-        if (!cleaned || cleaned === " [DONE]") {
-          return;
-        }
-
-        let parsed;
-        try {
-          parsed = JSON.parse(cleaned);
-        } catch (e) {
-          console.error(e);
-          return;
-        }
-
-        const content = parsed.choices[0]?.delta?.content;
-        if (content === undefined) {
-          continue;
-        }
-        buffer += content;
-
-        callback?.(content);
-      }
-    });
-
-    res.on("end", () => {
-      const [loadingMessages, loadedMessages] = _.partition(
-        submitMessages,
-        "loading"
-      );
-      const promptTokensUsed = countTokens(
-        loadedMessages.map((m) => m.content).join("\n")
-      );
-
-      const completionTokensUsed = countTokens(
-        loadingMessages.map((m) => m.content).join("\n") + buffer
-      );
-
-      endCallback?.(promptTokensUsed, completionTokensUsed);
-    });
+    const content = parsed.choices?.[0]?.delta?.content;
+    if (!content) return;
+    buffer += content;
+    callback?.(content);
   };
 
-  return _streamCompletion(
-    payload,
-    apiKey,
-    abortController,
-    successCallback,
-    errorCallback
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      const lines = pending.split("\n");
+      pending = lines.pop() || "";
+      lines.forEach((line) => handleLine(line.trim()));
+    }
+    handleLine(pending.trim());
+  } catch (e) {
+    if (abortController?.signal.aborted) {
+      endCallback?.(0, 0);
+      return;
+    }
+    errorCallback?.(0, String(e));
+    return;
+  }
+
+  const [loadingMessages, loadedMessages] = _.partition(
+    submitMessages,
+    "loading"
   );
+  const promptTokensUsed = countTokens(
+    loadedMessages.map((m) => m.content).join("\n")
+  );
+
+  const completionTokensUsed = countTokens(
+    loadingMessages.map((m) => m.content).join("\n") + buffer
+  );
+
+  endCallback?.(promptTokensUsed, completionTokensUsed);
 }
 
 export const OPENAI_TTS_VOICES = [
@@ -248,7 +237,7 @@ export async function genAudio({
     voice,
     response_format: 'mp3',
   });
-  const res = await fetch("https://api.openai.com/v1/audio/speech", {
+  const res = await fetch(`${OPENAI_BASE_URL}/audio/speech`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

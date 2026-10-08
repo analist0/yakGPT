@@ -6,6 +6,12 @@ import { NextRouter } from "next/router";
 import { APIState, ChatState, useChatStore } from "./ChatStore";
 import { submitMessage } from "./SubmitMessage";
 import { fetchModels } from "./OpenAI";
+import {
+  ProviderId,
+  getProviderConnection,
+  isProviderConfigured,
+  providers,
+} from "./Providers";
 
 const get = useChatStore.getState;
 const set = useChatStore.setState;
@@ -143,19 +149,38 @@ export const regenerateAssistantMessage = (message: Message) => {
 };
 
 export const refreshModels = async () => {
-  const { apiKey } = get();
-  // Load OpenAI models
-  if (!apiKey) return;
+  const state = get();
+  const provider = state.chatProvider;
+  if (!isProviderConfigured(state)) return;
 
   try {
-    const modelIDs = await fetchModels(apiKey);
-    // Use only models that start with gpt-3.5 or gpt-4
-    update({
-      modelChoicesChat: modelIDs.filter(
-        (id) => id.startsWith("gpt-3.5") || id.startsWith("gpt-4")
-      ),
-    });
+    const modelIDs = providers[provider].filterModels(
+      await fetchModels(getProviderConnection(state))
+    );
+    // Ignore stale results if the provider was switched meanwhile
+    if (get().chatProvider !== provider) return;
+    update({ modelChoicesChat: modelIDs });
+
+    // Make sure the selected model exists for this provider
+    const { settingsForm } = get();
+    if (modelIDs.length > 0 && !modelIDs.includes(settingsForm.model)) {
+      updateSettingsForm({ ...settingsForm, model: modelIDs[0] });
+    }
   } catch (error) {
     console.error("Failed to fetch models:", error);
+  }
+};
+
+export const setChatProvider = (chatProvider: ProviderId) => {
+  update({ chatProvider, modelChoicesChat: undefined });
+  refreshModels();
+};
+
+// Switch to a newly configured provider if the current one is unusable
+export const activateProviderIfNeeded = (provider: ProviderId) => {
+  if (!isProviderConfigured(get())) {
+    setChatProvider(provider);
+  } else if (get().chatProvider === provider) {
+    refreshModels();
   }
 };

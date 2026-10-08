@@ -68,6 +68,26 @@ $ echo "NEXT_PUBLIC_OPENAI_API_KEY=<your-open-ai-key-here>" > .env.local
 $ echo "NEXT_PUBLIC_11LABS_API_KEY=<your-eleven-labs-key-here>" >> .env.local
 ```
 
+### Other chat providers
+
+Besides OpenAI, chat can run on [xAI](https://console.x.ai) (Grok models) or a local [Ollama](https://ollama.com) server. Add them under **API Keys**, then pick the provider and model from the ⋮ menu next to the chat input. Speech to text (Whisper) and OpenAI text to speech still need an OpenAI key.
+
+Ollama has to allow requests from the app's origin, for example:
+
+```
+$ OLLAMA_ORIGINS=http://localhost:3000 ollama serve
+```
+
+With an xAI key set, the headset button next to the chat input starts a realtime voice conversation with Grok (speech in, speech out, with server-side turn detection so you can interrupt it). Both sides are transcribed into the current chat, and the chat's system prompt and recent messages are given to the voice model as context. Voice and model are under **Settings → xAI Voice**.
+
+They can also be set in `.env.local`:
+
+```
+NEXT_PUBLIC_XAI_API_KEY=<your-xai-key-here>
+NEXT_PUBLIC_OLLAMA_BASE_URL=http://localhost:11434/v1
+NEXT_PUBLIC_CHAT_PROVIDER=openai   # openai | xai | ollama
+```
+
 ## 🐳 Docker
 
 To use the pre-built Docker image from Docker Hub (only for amd64), run:

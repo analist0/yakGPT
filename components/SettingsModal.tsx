@@ -17,13 +17,20 @@ import {
 } from "@mantine/core";
 import ISO6391 from "iso-639-1";
 import { useForm } from "@mantine/form";
-import { IconBraces, IconMicrophone, IconSettings } from "@tabler/icons-react";
+import {
+  IconBraces,
+  IconHeadset,
+  IconMicrophone,
+  IconSettings,
+} from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import * as ElevenLabs from "@/stores/ElevenLabs";
 import { refreshModels, updateSettingsForm } from "@/stores/ChatActions";
 import * as Azure from "@/stores/AzureSDK";
 import { azureCandidateLanguages } from "./azureLangs";
 import { OPENAI_TTS_VOICES, validateVoice } from "@/stores/OpenAI";
+import { providers } from "@/stores/Providers";
+import { XAI_REALTIME_MODELS, XAI_REALTIME_VOICES } from "@/stores/XaiRealtime";
 
 function getLanguages() {
   const languageCodes = ISO6391.getAllCodes();
@@ -36,6 +43,7 @@ function getLanguages() {
 export default function SettingsModal({ close }: { close: () => void }) {
   const modelChoicesChat =
     useChatStore((state) => state.modelChoicesChat) || [];
+  const chatProvider = useChatStore((state) => state.chatProvider);
   const [voices11Labs, setVoices11Labs] = useState<ElevenLabs.Voice[]>([]);
   const [voicesAzure, setVoicesAzure] = useState<Azure.Voice[]>([]);
   const [voiceStylesAzure, setVoiceStylesAzure] = useState<string[]>([]);
@@ -139,6 +147,9 @@ export default function SettingsModal({ close }: { close: () => void }) {
             <Tabs.Tab value="11labs" icon={<IconBraces size={px("0.8rem")} />}>
               ElevenLabs
             </Tabs.Tab>
+            <Tabs.Tab value="xai" icon={<IconHeadset size={px("0.8rem")} />}>
+              xAI Voice
+            </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="openai" pt="xs">
             <Accordion defaultValue="general">
@@ -147,7 +158,7 @@ export default function SettingsModal({ close }: { close: () => void }) {
                 <Accordion.Panel>
                   <Select
                     required
-                    label="Model"
+                    label={`Model (${providers[chatProvider].name})`}
                     placeholder="Select a model"
                     value={form.values.model}
                     onChange={(value) => form.setFieldValue("model", value!)}
@@ -403,6 +414,28 @@ export default function SettingsModal({ close }: { close: () => void }) {
                 value: voice.voice_id,
               }))}
             ></Select>
+          </Tabs.Panel>
+          <Tabs.Panel value="xai" pt="xs">
+            <Title pt="xs" pb="md" order={4}>
+              Realtime voice
+            </Title>
+            <Select
+              label="Model"
+              value={form.values.realtime_model_xai}
+              onChange={(value) =>
+                form.setFieldValue("realtime_model_xai", value!)
+              }
+              data={[...XAI_REALTIME_MODELS]}
+            />
+            <Select
+              label="Voice"
+              value={form.values.voice_id_xai}
+              onChange={(value) => form.setFieldValue("voice_id_xai", value!)}
+              data={XAI_REALTIME_VOICES.map((voice) => ({
+                label: voice[0].toUpperCase() + voice.slice(1),
+                value: voice,
+              }))}
+            />
           </Tabs.Panel>
           <Group position="apart" mt="lg">
             <Button
