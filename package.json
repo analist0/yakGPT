@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "build:webpack": "next build --webpack",
+    "start": "node scripts/start.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

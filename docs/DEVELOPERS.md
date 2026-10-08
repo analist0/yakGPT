@@ -1,0 +1,293 @@
+# YakGPT: מדריך למפתחים
+
+מסמך זה מתאר מה נבנה, איך הקוד מאורגן, מה באמת עובד (ומה נבדק ואיך), מה לא עובד או חסר, איפה אנחנו תקועים, ומה התוכנית להמשך. הוא נכתב בכוונה בכנות: "נבדק" כאן אומר שהרצנו את זה, ו"לא נבדק" אומר שלא.
+
+עדכון אחרון: אוקטובר 2026.
+
+---
+
+## 1. מה זה YakGPT היום
+
+ממשק צ'אט שרץ בדפדפן, עם שרת Next.js דק. המפתחות והשיחות נשמרים ב־localStorage של הדפדפן, והבקשות לספקי המודלים יוצאות ישירות מהדפדפן.
+
+השרת משמש רק לשלושה דברים: הרצת שרתי MCP מקומיים (stdio), זיהוי חומרה, וכלי `fetch_url`.
+
+| תחום | מה יש |
+|---|---|
+| ספקי צ'אט | OpenAI, xAI, Groq, OpenRouter, Google Gemini, Ollama (כולם דרך API תואם OpenAI) |
+| מודלים מקומיים | זיהוי חומרה, המלצות Ollama לפי זיכרון/VRAM, הורדה ומחיקה של מודלים |
+| כלים | לולאת סוכן (עד 8 צעדים), כלים מובנים: שעה, מחשבון, `fetch_url` |
+| MCP | שרתים מרוחקים מהדפדפן (Streamable HTTP + SSE), שרתים מקומיים (stdio) דרך `/api/mcp` |
+| סקילים | חבילות הוראות בפורמט SKILL.md, נטענות לפי הצורך עם `load_skill`, ייבוא מ־GitHub |
+| קול | הכתבה (Whisper / Azure), הקראה (OpenAI / Azure / ElevenLabs), שיחה בזמן אמת עם Grok |
+| ניטור | יומן שגיאות באפליקציה, Error Boundaries, Sentry אופציונלי |
+| ממשק | Next 16, React 19, Mantine 9, עברית מימין לשמאל כברירת מחדל, בהיר/כהה, מובייל, PWA |
+| התקנה | סקריפטים ללינוקס/macOS/Termux (`install.sh`) ול־Windows (`install.ps1`), Docker |
+
+---
+
+## 2. מפת הקוד
+
+```
+pages/
+  _app.tsx              # ספקים (Mantine, כיוון RTL), אתחול ניטור/MCP/Ollama, אשף פתיחה
+  _document.tsx         # <html dir="rtl">, manifest, סקריפטים של opus-media-recorder
+  index.tsx, chat/[chatId].tsx  → components/chat/ChatView
+  api/mcp.ts            # מריץ שרתי MCP מקומיים (stdio). מקומי בלבד
+  api/hardware.ts       # זיהוי חומרה (systeminformation). מקומי בלבד
+  api/fetch-url.ts      # שרת של הכלי fetch_url. מקומי בלבד
+
+stores/                 # מצב (zustand) ולוגיקה, בלי UI
+  ChatStore.ts          # המצב הנשמר ב־localStorage (מפתח: chat-store-v23)
+  ChatActions.ts        # פעולות על שיחות, בחירת ספק/מודל, refreshModels
+  SubmitMessage.ts      # לולאת הסוכן: שליחה → tool calls → הרצה → חזרה למודל
+  OpenAI.ts             # לקוח לכל ה־API התואמים OpenAI: streaming, tool calls, reasoning, TTS
+  Providers.ts          # רישום הספקים: base URL, מסנן מודלים, בדיקת מפתח
+  Tools.ts              # רישום הכלים: מובנים + load_skill + כלי MCP
+  Mcp.ts                # חיבור לשרתי MCP (HTTP מהדפדפן, stdio דרך /api/mcp)
+  Skills.ts             # סקילים: שמירה, פרסור SKILL.md, prompt של רשימת הסקילים
+  Ollama.ts             # API מקורי של Ollama: רשימה, pull עם התקדמות, מחיקה
+  XaiRealtime.ts        # שיחה קולית בזמן אמת עם Grok (WebSocket)
+  ErrorLog.ts           # captureError + יומן שגיאות + Sentry
+  Recorder*/Player*/Azure*/ElevenLabs.ts  # הכתבה והקראה (קוד ישן יותר, עודכן מעט)
+
+lib/
+  localModels.ts        # קטלוג מודלי Ollama + חישוב "מה נכנס בזיכרון"
+  githubSkills.ts       # מציאת SKILL.md במאגר GitHub
+  serverAccess.ts       # requireLocal(): נתיבי API רגישים עונים רק ל־loopback
+  i18n.ts, theme.ts, characters.ts
+
+components/
+  layout/               # AppShell, Sidebar, TopBar
+  chat/                 # ChatView, MessageBubble, MessageContent (reasoning/tool cards), Composer, ModelPicker, NewChat
+  modals/               # Providers, Settings, Tools/MCP/Skills, LocalModels, ErrorLog, GithubSkillsImport
+  Welcome.tsx           # אשף פתיחה (שפה → מודלים מקומיים → ספקי ענן)
+
+scripts/
+  install.sh / install.ps1 / start.mjs
+```
+
+### איך הודעה זורמת (הלב של המערכת)
+
+1. `Composer` קורא ל־`submitMessage` (בקובץ `stores/SubmitMessage.ts`).
+2. `activeTools()` מחזיר את הכלים הפעילים: מובנים, `load_skill` אם יש סקילים פעילים, וכלי MCP מחוברים.
+3. `streamCompletion` (בקובץ `stores/OpenAI.ts`) שולח `POST {baseUrl}/chat/completions` עם `stream: true` ו־`tools`.
+4. ה־stream מפורסר שורה אחרי שורה. שלושה סוגי תוכן נאספים: `content`, ‏`reasoning_content` ו־`tool_calls`. ה־`tool_calls` מגיעים בחלקים לפי index ונתפרים יחד.
+5. אם יש tool calls:
+   - הם רצים דרך `runTool`;
+   - התוצאות נשמרות על הודעת ה־assistant ב־`toolCalls`;
+   - הלולאה ממשיכה עד שאין יותר tool calls, או עד 8 צעדים.
+6. `toApiMessages` הופך את `toolCalls` השמורים להודעות `assistant` ו־`tool` בפורמט של OpenAI.
+7. אם הספק מחזיר 4xx שמזכיר tool/function, השליחה מתבצעת שוב בלי כלים.
+
+---
+
+## 3. מה עובד ומה לא
+
+מקרא:
+- ✅ עובד, ונבדק אצלנו מקצה לקצה.
+- 🟡 הקוד קיים, אבל נבדק רק מול שרת מדומה (mock) או חלקית.
+- ❌ לא עובד או לא קיים.
+
+### ספקים ומודלים
+
+| פיצ'ר | מצב | הערות |
+|---|---|---|
+| צ'אט ב־streaming דרך API תואם OpenAI | 🟡 | נבדק מול שרת mock שמחקה Ollama (כולל SSE שנחתך באמצע שורה). לא נבדק עם מפתחות אמיתיים, כי לא היו לנו |
+| אימות מפתחות Groq / OpenRouter / Gemini | ✅ | נבדק מול ה־API האמיתיים: מפתח שגוי נדחה. ב־OpenRouter הבדיקה היא מול `/key`, כי `/models` שלהם ציבורי |
+| אימות מפתח xAI | ✅ | מפתח שגוי נדחה מול `api.x.ai` |
+| בחירת מודל לפי ספק + זכירת המודל האחרון | ✅ | |
+| Ollama: זיהוי, רשימת מודלים, צ'אט | 🟡 | מול mock בלבד. אין Ollama בסביבת הפיתוח שלנו |
+| הורדת מודלים מ־Ollama עם התקדמות | 🟡 | הקוד קורא ל־`/api/pull` עם NDJSON. לא נבדקה הורדה אמיתית |
+| זיהוי חומרה | ✅ | על לינוקס (Xeon, 15.7GB). Windows/macOS/Android לא נבדקו. בדפדפן יש fallback (WebGPU + deviceMemory, מוגבל ל־8GB) |
+| המלצות מודלים לפי חומרה | 🟡 | הלוגיקה עובדת. גדלי המודלים בקטלוג הם הערכות ידניות של q4 ויש לעדכן אותם מדי פעם |
+| תצוגת חשיבה (reasoning) | 🟡 | `reasoning_content` ו־`<think>` נבדקו מול mock |
+| עלות לשיחה | 🟡 | יש מחירים רק לדגמי GPT ישנים. לשאר הדגמים מוצג 0 |
+
+### כלים, MCP וסקילים
+
+| פיצ'ר | מצב | הערות |
+|---|---|---|
+| לולאת כלים (tool calls ב־streaming, הרצה, חזרה למודל) | ✅ | נבדק מקצה לקצה מול mock, כולל arguments שמגיעים בכמה חלקים |
+| כלים מובנים: שעה ומחשבון | ✅ | |
+| `fetch_url` | ✅ | מקומי בלבד. ב־Vercel/רשת הוא מחזיר 403 בכוונה |
+| MCP מרוחק (HTTP) מהדפדפן | ✅ | DeepWiki התחבר (3 כלים). דורש שהשרת יאפשר CORS. DeepWiki, ‏Context7 ו־GitHub Copilot MCP מאפשרים |
+| MCP מקומי (stdio) | ✅ | `@modelcontextprotocol/server-memory` התחבר (9 כלים) והמודל קרא לכלי שלו |
+| ייבוא `mcp.json` (פורמט Claude Desktop / Cursor) | 🟡 | הפרסור נבדק ידנית בלבד |
+| סקילים + `load_skill` | ✅ | רשימת הסקילים נכנסת ל־system prompt, והכלי מחזיר את ההוראות |
+| ייבוא סקילים מ־GitHub | 🟡 | קבצי SKILL.md אמיתיים מ־`anthropics/skills` נקראו ויובאו. קריאת עץ הקבצים ב־`api.github.com` נבדקה רק מול mock, כי היא חסומה בסביבת הפיתוח |
+| אישור משתמש לפני הרצת כלי | ❌ | כל כלי רץ אוטומטית. זה בסדר לכלים קריאים, ולא בסדר לכלי MCP שכותבים או מוחקים. ראו סעיף 7 |
+| MCP: Resources / Prompts / Sampling | ❌ | רק Tools נתמכים |
+| MCP: אימות OAuth | ❌ | רק כותרות סטטיות (למשל `Authorization: Bearer ...`) |
+| סקילים: הרצת סקריפטים מצורפים | ❌ | נטענות רק ההוראות. קבצים נלווים נגישים רק דרך `fetch_url`, כלומר רק בהרצה מקומית |
+
+### קול
+
+| פיצ'ר | מצב | הערות |
+|---|---|---|
+| הכתבה (Whisper / Azure) והקראה (OpenAI / Azure / ElevenLabs) | 🟡 | קוד מקורי של YakGPT, הותאם ל־UI החדש. לא נבדק מחדש עם מפתחות אמיתיים |
+| שיחה בזמן אמת עם Grok | 🟡 | נבדקו מול WebSocket מדומה: טוקן זמני, `session.update`, הזרמת מיקרופון ותמלולים. **שיחה חיה מול xAI לא נבדקה.** שדה הטוקן בתשובה לא מתועד אצל xAI, ולכן הקוד מנסה גם `value` וגם `client_secret.value` |
+| שיחה בזמן אמת עם כלים / MCP / סקילים | ❌ | **לא מחובר.** ה־Realtime מקבל רק instructions והיסטוריה. ראו סעיף 6.1 |
+| בחירת מודל קולי אוטומטית | ❌ | |
+
+### תמונות, וידאו וקבצים
+
+| פיצ'ר | מצב |
+|---|---|
+| שליחת תמונה או קובץ למודל (vision) | ❌ אין צירוף קבצים. `Message.content` הוא מחרוזת בלבד |
+| יצירת תמונות | ❌ |
+| עריכת תמונות | ❌ |
+| יצירת וידאו (מטקסט או מתמונה) | ❌ |
+| ניתוב אוטומטי למודל לפי משימה ("צור תמונה" → מודל תמונה) | ❌ |
+
+### תשתית
+
+| פיצ'ר | מצב | הערות |
+|---|---|---|
+| Build / lint / typecheck | ✅ | `yarn build`, ‏`yarn lint`, ‏`yarn typecheck` נקיים |
+| התקנה בלינוקס | ✅ | `install.sh` רץ מקצה לקצה. השרת מאזין רק ל־127.0.0.1 |
+| התקנה ב־Termux | 🟡 | סימולציה בלבד: משתני Termux וקומפיילר SWC ב־WASM. לא נבדק על טלפון אמיתי |
+| התקנה ב־Windows | 🟡 | `install.ps1` רץ ב־PowerShell 7 על לינוקס. `winget`, `cmd start` ו־Windows אמיתי לא נבדקו |
+| Docker | 🟡 | Dockerfile עודכן ל־Node 22. ה־image לא נבנה בסביבה שלנו |
+| Vercel | 🟡 | ה־build עובר (פרויקט `josephgpt`). גרסאות preview מוגנות בהתחברות. נתיבי ה־API המקומיים מחזירים 403 בכוונה |
+| Sentry | 🟡 | מופעל דרך `NEXT_PUBLIC_SENTRY_DSN`. שליחה אמיתית לא נבדקה |
+| בדיקות אוטומטיות (tests) | ❌ | **אין test suite בריפו.** כל הבדיקות שנעשו היו סקריפטים זמניים של Playwright שלא נשמרו |
+| CI | ❌ | ב־GitHub Actions של ה־fork אין אף ריצה, כנראה כי Actions כבויים (ברירת המחדל ל־fork). ה־workflow היחיד, `docker-push.yml`, דוחף ל־Docker Hub של הפרויקט המקורי (`yakgpt/yakgpt`) עם secret שלא קיים כאן, אז אם יפעילו Actions הוא ייכשל. אין CI שמריץ build או lint |
+
+---
+
+## 4. מה צריך כדי להפעיל באמת
+
+1. **Node 20.9+**, ואחריו `./scripts/install.sh` או `scripts\install.ps1` (ראו README).
+2. **מפתח לפחות לספק אחד**, דרך "ספקים ומפתחות" באפליקציה, או Ollama מקומי.
+3. **פיצ'רים מקומיים** (MCP stdio, זיהוי חומרה, `fetch_url`): עובדים רק כשהדפדפן והשרת על אותו מחשב.
+   - ב־Docker או מאחורי reverse proxy צריך `YAKGPT_LOCAL_FEATURES=1`.
+   - **לעולם לא** על שרת חשוף לאינטרנט: זה מאפשר לכל מבקר להריץ פקודות.
+4. **Ollama מאתר שלא רץ על localhost:** צריך להגדיר `OLLAMA_ORIGINS=<כתובת האתר>`. החלון "מודלים מקומיים" מציג את הפקודה המדויקת לכל מערכת.
+5. **שיחה קולית בזמן אמת:** דורשת מפתח xAI. הדפדפן מנפיק טוקן זמני ישירות מ־xAI.
+6. **משתני סביבה** (רשימה מלאה ב־README):
+   - `NEXT_PUBLIC_*_API_KEY`: **רק לשימוש מקומי.** המשתנים האלה נכנסים ל־bundle של הדפדפן, אז אסור להגדיר אותם ב־Vercel.
+   - `NEXT_PUBLIC_SENTRY_DSN`: הפעלת Sentry.
+   - `YAKGPT_LOCAL_FEATURES`: ראו סעיף 3 ברשימה הזו.
+   - `YAKGPT_UNOPTIMIZED_IMAGES`: הגשת תמונות בלי אופטימיזציה. מופעל אוטומטית באנדרואיד.
+
+---
+
+## 5. איפה אנחנו תקועים
+
+| חסם | למה | מה צריך |
+|---|---|---|
+| אין אימות מול שירותים אמיתיים | בסביבת הפיתוח אין מפתחות API, אין Ollama ואין מכשירי Windows או אנדרואיד | מישהו עם מפתחות שירוץ על רשימת הבדיקה בסעיף 8 |
+| פריסה ל־Vercel מהסוכן | לחיבור Vercel של הסוכן אין הרשאה ליצור פרויקטים (403) | המשתמש חיבר את Vercel ידנית (פרויקט `josephgpt`), וזה עובד |
+| שרתי MCP מקומיים מהטלפון / מ־Vercel | stdio דורש תהליך על אותו מחשב | הרצת YakGPT ב־Termux, או Supergateway/MetaMCP שחושפים שרתים מקומיים ב־HTTP |
+| `api.github.com` בסביבת הפיתוח | חסום על ידי proxy | אצל משתמשים זה עובד (CORS פתוח). ללא התחברות יש מגבלה של 60 בקשות לשעה |
+| אין CI | Actions לא רצים ב־fork, ו־`docker-push.yml` מפנה ל־Docker Hub שאינו שלנו | להפעיל Actions, להחליף ב־workflow של build + lint + typecheck, ולהפעיל Docker push רק אם יש secret |
+
+---
+
+## 6. תוכנית לפערים העיקריים
+
+### 6.1 חיבור השיחה הקולית לכלים, MCP וסקילים
+
+כרגע `XaiRealtime.ts` שולח ב־`session.update` רק `instructions`, ‏`voice`, ‏`turn_detection` ו־`audio`.
+
+לפי התיעוד של xAI:
+- `session.update` מקבל `tools`, כולל `function`, `mcp`, ‏`web_search` ו־`x_search`.
+- קריאה לכלי מגיעה באירוע `response.function_call_arguments.done`.
+- מחזירים תשובה עם `conversation.item.create` מסוג `function_call_output`, ואחרי **כל** התוצאות שולחים `response.create` אחד.
+
+תוכנית:
+1. **רשימת הכלים:** להעביר את `activeTools()` ל־`session.tools` בפורמט function (שם, תיאור, JSON Schema). בהתאם להגדרה, לצרף גם `web_search` / `x_search` של xAI.
+2. **הרצה:** ב־`handleEvent` לטפל ב־`response.function_call_arguments.done` ולהריץ דרך אותו `runTool` של הצ'אט. כך MCP, סקילים והכלים המובנים עובדים בלי קוד נוסף.
+3. **סקילים:** להוסיף את `skillsPrompt()` ל־instructions.
+4. **תצוגה:** לשמור את הקריאות על הודעת ה־assistant (`toolCalls`) כדי שיוצגו בצ'אט כמו בטקסט.
+5. **אישורים:** כלים שדורשים אישור (סעיף 7) יוצגו כבקשת אישור קולית ובמסך.
+
+היקף משוער: בעיקר `XaiRealtime.ts`. הלוגיקה של הכלים כבר קיימת.
+
+### 6.2 תמונות, וידאו, vision וניתוב אוטומטי
+
+**א. צירוף קבצים ו־vision (קודם לכול, כי שאר הסעיפים נשענים עליו):**
+- להרחיב את `Message` ל־`content: string | ContentPart[]` (טקסט ו־`image_url` כ־data URL).
+- להוסיף צירוף והדבקה של תמונות ב־`Composer`.
+- רוב הספקים שלנו מקבלים תמונות בפורמט OpenAI: ‏GPT-4o/4.1/5, ‏Gemini, ‏Grok עם vision, ‏OpenRouter, ומודלי vision ב־Ollama כמו `gemma3` ו־`qwen2.5vl`.
+- `truncateMessages`, ‏`toApiMessages` והשמירה ב־localStorage צריכים להתמודד עם תמונות. localStorage מוגבל לכמה MB, ולכן תמונות כנראה יישמרו ב־IndexedDB.
+
+**ב. יצירה ועריכה של תמונות, כ"כלים":**
+
+הכי פשוט ועקבי עם הארכיטקטורה הוא להוסיף אותן ככלים (`generate_image`, ‏`edit_image`) שהמודל מפעיל בעצמו. כך "צור תמונה של..." עובד מכל מודל צ'אט שתומך בכלים, בלי ניתוב מיוחד.
+
+| ספק | API | הערות |
+|---|---|---|
+| OpenAI | `POST /v1/images/generations`, ‏`/v1/images/edits` | מתועד ויציב |
+| xAI | `POST https://api.x.ai/v1/images/generations` | לפי מקורות צד שלישי, מודלים `grok-imagine-image` ו־`grok-imagine-image-quality`. **לאמת מול docs.x.ai לפני כתיבת קוד.** המחירים ושמות המודלים במקורות סותרים |
+| Gemini | מודלי image של Gemini | לבדוק תמיכה ב־endpoint התואם OpenAI |
+
+התמונה שתוחזר תוצג בבועת ה־assistant ותישמר מקומית.
+
+**ג. וידאו (טקסט לווידאו, תמונה לווידאו):**
+- xAI מציע לפי מקורות צד שלישי מודל `grok-imagine-video`: קליפים של 1–15 שניות, 480p/720p, טקסט לווידאו ותמונה לווידאו.
+- היצירה **אסינכרונית**: שולחים בקשה, ואז בודקים סטטוס עד שהווידאו מוכן.
+- בצד שלנו נדרשים כלי `generate_video` שמחזיר "משימה", ורכיב שמציג התקדמות ואת הווידאו כשהוא מוכן.
+- התמחור לפי שנייה, ולכן חובה אישור משתמש לפני כל יצירה.
+- **לאמת את ה־API הרשמי לפני מימוש**: המקורות סותרים לגבי שם המודל והמחיר.
+
+**ד. "החלפת מודלים אוטומטית":** יש שתי גישות.
+1. **כלים (מומלץ):** מודל הצ'אט נשאר אחד, ומפעיל `generate_image` / `generate_video` / `analyze_image` שמאחוריהם יש מודל ייעודי. פשוט, שקוף, ועובד כבר עם הלולאה הקיימת.
+2. **Router:** מודל קטן ומהיר (למשל ב־Groq) מסווג כל הודעה ובוחר מודל. זה מוסיף השהיה ועלות, וקשה לדבג. מומלץ רק אחרי שגישה 1 עובדת.
+
+תמונות ווידאו עולים כסף לכל יצירה. לכן ההגדרות צריכות לכלול:
+- בחירה איזה ספק משמש לתמונה ולווידאו;
+- תקרת עלות;
+- אישור לפני יצירה.
+
+---
+
+## 7. חוב טכני ותיקונים מומלצים (לפי עדיפות)
+
+1. **אישור לפני הרצת כלים.**
+   - דגל לכל כלי: אוטומטי / דורש אישור.
+   - ברירת מחדל: כלי MCP דורשים אישור; כלים מובנים קריאים רצים אוטומטית.
+   - כרטיס "המודל רוצה להריץ X עם Y: לאשר?" בצ'אט.
+2. **Test suite.**
+   - בדיקות יחידה (Vitest) ל־`parseSkillMarkdown`, ‏`parseGithubSource`, ‏`truncateMessages`, ‏`toApiMessages`, ‏`recommendModels` ופרסור ה־SSE.
+   - Playwright לזרימות המרכזיות מול שרת mock. הסקריפטים ששימשו בפיתוח יכולים להוות בסיס.
+3. **CI:** להחליף את `docker-push.yml` ב־workflow שמריץ `yarn install --frozen-lockfile && yarn lint && yarn typecheck && yarn build` על כל PR.
+4. **אחסון:** להעביר שיחות ל־IndexedDB לפני שמוסיפים תמונות (מגבלת localStorage).
+5. **קבצי קול ישנים** (`RecorderActions`, ‏`PlayerActions`, ‏`AzureRecorderActions`): עוד משתמשים ב־axios ובקוד מ־2023. לאחד תחת `captureError` ולבדוק מחדש.
+6. **קטלוג המודלים המקומיים** (`lib/localModels.ts`): סטטי. לשקול טעינה מ־ollama.com או עדכון ידני מתועד.
+7. **מחירים:** `stores/Model.ts` מכיל רק מחירי GPT ישנים. OpenRouter מחזיר מחירים ב־`/models`, ואפשר להשתמש בזה.
+
+---
+
+## 8. רשימת בדיקה ידנית (למי שיש מפתחות ומכשירים)
+
+- [ ] שיחה עם כל ספק: OpenAI, xAI, Groq, OpenRouter, Gemini. כולל streaming, עצירה באמצע ויצירת כותרת אוטומטית.
+- [ ] כלים מול ספק אמיתי. למשל "כמה זה 17.5^3" צריך להפעיל את המחשבון.
+- [ ] Ollama אמיתי: זיהוי, הורדת מודל קטן (`qwen3:0.6b`), צ'אט ומחיקה.
+- [ ] שיחה קולית בזמן אמת עם Grok: חיבור, דיבור, קטיעה, תמלול בצ'אט.
+- [ ] הכתבה (Whisper) והקראה (OpenAI) עם מפתח OpenAI.
+- [ ] ייבוא `anthropics/skills` מ־GitHub ושימוש בסקיל בצ'אט.
+- [ ] MCP מרוחק (DeepWiki) ומקומי (`npx -y @modelcontextprotocol/server-filesystem <dir>`).
+- [ ] Windows: ‏`install.ps1` ואז `yakgpt.cmd`.
+- [ ] Termux על טלפון אמיתי: ‏`install.sh --ollama --boot`, ואז "הוסף למסך הבית".
+- [ ] Sentry: שגיאה מגיעה ל־DSN.
+
+---
+
+## 9. עבודה שוטפת
+
+```
+yarn dev            # פיתוח
+yarn lint           # ESLint 9 (כולל חוקי React Compiler)
+yarn typecheck      # tsc --noEmit
+yarn build          # Turbopack. ב־Termux: yarn build:webpack
+yarn start          # node scripts/start.mjs (127.0.0.1:3000)
+```
+
+מוסכמות:
+- **טקסטים בממשק:** תמיד בשתי שפות, `t("English", "עברית")`.
+- **עיצוב:** CSS Modules עם טוקנים מ־`styles/globals.css` (`--app-*`).
+- **שגיאות:** כל שגיאה עוברת דרך `captureError(source, error, { details })`.
+- **נתיבי API שנוגעים במחשב** (מריצים תהליכים, קוראים חומרה, יוצאים לרשת): חייבים לקרוא ל־`requireLocal`.
+- **מפתחות:** לא מכניסים מפתחות לקוד ולא ל־env של Vercel.
