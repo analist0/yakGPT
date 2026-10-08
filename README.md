@@ -158,6 +158,10 @@ Remember to use a supported web browser and ensure your microphone is functionin
 
 YakGPT uses your own API keys. Chats and keys are stored in your browser, and requests go directly from your browser to the provider you chose. The YakGPT server is only involved for local MCP servers, hardware detection and the `fetch_url` tool.
 
+## 👩‍💻 For developers
+
+[docs/DEVELOPERS.md](docs/DEVELOPERS.md) (Hebrew) covers the code map, how a message flows through the agent loop, what is tested and what isn't, known gaps (voice ↔ tools, images/video, tool approval, tests/CI) and the plan for each.
+
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release (Hebrew and English).
